@@ -68,7 +68,7 @@ with recursive
           )
         )
       )
-      and rc_1.total_lines < (asdasd
+      and rc_1.total_lines < (
         (
           select
             max(comparison_phone.mobile_lines + 2) as max
