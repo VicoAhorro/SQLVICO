@@ -1357,21 +1357,19 @@ with recursive
       uep.savings,
       uep.savings_yearly,
       uep.tarifa_plana,
-      case
-        when uep.new_company is not null
-        and uep.savings_yearly > 0::double precision then uep.savings_yearly * 1::double precision + COALESCE(uep.total_crs, 0::real) * 4::double precision
-        else 0.0::double precision
-      end as ranked_crs,
+      CASE
+          WHEN ((uep.new_company IS NOT NULL) AND (uep.savings_yearly > (0)::double precision)) 
+              THEN ((uep.savings_yearly * (1)::double precision) + (COALESCE(uep.total_crs, (0)::real) * (4)::double precision))
+          ELSE (uep.savings_yearly * (1)::double precision) + (COALESCE(uep.total_crs, (0)::real) * (4)::double precision)
+      END AS ranked_crs,
       row_number() over (
-        partition by
-          uep.id
-        order by
-          (
-            case
-              when uep.new_company is not null
-              and uep.savings_yearly > 0::double precision then uep.savings_yearly * 1::double precision + COALESCE(uep.total_crs, 0::real) * 4::double precision
-              else 0.0::double precision
-            end
+          partition by uep.id
+          order by (
+              case
+                  when uep.new_company is not null and uep.savings_yearly > 0::double precision 
+                      then uep.savings_yearly * 1::double precision + COALESCE(uep.total_crs, 0::real) * 4::double precision
+                  else uep.savings_yearly * 1::double precision + COALESCE(uep.total_crs, 0::real) * 4::double precision
+              end
           ) desc
       ) as rank,
       uep.cif,
