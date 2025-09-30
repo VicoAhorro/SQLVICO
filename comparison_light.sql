@@ -208,7 +208,7 @@ ranked AS (
     CASE
       WHEN w.new_company IS NOT NULL AND w.savings_yearly > 0
         THEN w.savings_yearly + COALESCE(w.total_crs,0)::double precision * 4.0
-      ELSE 0.0
+      ELSE w.savings_yearly + COALESCE(w.total_crs,0)::double precision * 4.0
     END AS ranked_crs,
     ROW_NUMBER() OVER (
       PARTITION BY w.id
@@ -216,7 +216,7 @@ ranked AS (
         CASE
           WHEN w.new_company IS NOT NULL AND w.savings_yearly > 0
             THEN w.savings_yearly + COALESCE(w.total_crs,0)::double precision * 4.0
-          ELSE 0.0
+          ELSE w.savings_yearly + COALESCE(w.total_crs,0)::double precision * 4.0
         END DESC
     ) AS rank
   FROM with_crs w

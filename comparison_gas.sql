@@ -267,7 +267,7 @@ ranked_comparisons AS (
     CASE
       WHEN uep.new_company IS NOT NULL AND uep.savings_yearly > 0 THEN
         uep.savings_yearly + COALESCE(uep.total_crs,0) * 4::double precision
-      ELSE 0.0::double precision
+      ELSE uep.savings_yearly + COALESCE(uep.total_crs,0) * 4::double precision
     END AS ranked_crs,
     ROW_NUMBER() OVER (
       PARTITION BY uep.id
@@ -275,7 +275,7 @@ ranked_comparisons AS (
         CASE
           WHEN uep.new_company IS NOT NULL AND uep.savings_yearly > 0 THEN
             uep.savings_yearly + COALESCE(uep.total_crs,0) * 4::double precision
-          ELSE 0.0::double precision
+          ELSE uep.savings_yearly + COALESCE(uep.total_crs,0) * 4::double precision
         END DESC
     ) AS rank
   FROM unified_extended_prices uep
