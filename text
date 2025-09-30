@@ -101,6 +101,7 @@ tarifa_plana
 iee_monthly
 iee
 new_total_price_with_vat
+new_total_yearly_price_with_vat
 saving_percentage
 supervisors
 client_name

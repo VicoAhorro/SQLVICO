@@ -387,6 +387,7 @@ SELECT DISTINCT
 
   -- Precio nuevo mensual con IVA
   rc.new_total_price_with_vat,
+  rc.new_total_yearly_price_with_vat,
 
   -- % ahorro (coherente con gas/3_0)
   CASE

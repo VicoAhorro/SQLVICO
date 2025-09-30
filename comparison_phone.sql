@@ -247,6 +247,8 @@ SELECT DISTINCT
   0.0::double precision AS iee_monthly,
   0.0::double precision AS iee,
   rp.new_total_price AS new_total_price_with_vat,
+  COALESCE(rp.phone_total_anual_price, (rp.new_total_price*12)::double precision)
+    AS new_total_yearly_price_with_vat,
   CASE
     WHEN rp.current_total_invoice > 0
       THEN (rp.current_total_invoice*12 - COALESCE(rp.phone_total_anual_price,0)::double precision)
@@ -263,7 +265,7 @@ SELECT DISTINCT
   EXTRACT(YEAR  FROM rp.created_at)::int AS created_year,
   concat_ws(', ', rp.client_email, rp.cups) AS search,
   ARRAY[rp.company, 'All'] AS company_filter,
-  FALSE AS cif,         -- <<< BOOLEANA para alinear con las otras vistas
+  FALSE AS cif,       
   NULL::text AS region  -- texto (si en las otras es text)
 FROM ranked_phone rp
 LEFT JOIN _users_supervisors us ON rp.advisor_id = us.user_id

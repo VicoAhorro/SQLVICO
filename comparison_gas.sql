@@ -410,6 +410,7 @@ SELECT
 
   -- (9) Nuevos importes con IVA y % ahorro
   rc.monthly_new_with_vat AS new_total_price_with_vat,
+  rc.annual_new_with_vat  AS new_total_yearly_price_with_vat,
   CASE
     WHEN rc.tarifa_plana = TRUE THEN
       (
