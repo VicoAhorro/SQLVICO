@@ -433,8 +433,8 @@ SELECT
   ARRAY[COALESCE(u.email,''::text), 'All']     AS advisor_filter,
 
   -- (11) Derivados fecha y búsquedas
-  EXTRACT(MONTH FROM rc.created_at)::int       AS created_month,
-  EXTRACT(YEAR  FROM rc.created_at)::int       AS created_year,
+  EXTRACT(MONTH FROM rc.created_at)::text       AS created_month,
+  EXTRACT(YEAR  FROM rc.created_at)::text       AS created_year,
   LOWER(
     COALESCE(rc."CUPS",'') || ' ' ||
     COALESCE(rc.client_email,'') || ' ' ||
