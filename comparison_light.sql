@@ -1,11 +1,7 @@
-DROP VIEW IF EXISTS public._comparisons_detailed_light;
+-- DROP VIEW IF EXISTS public._comparisons_detailed_light;
 
-CREATE OR REPLACE VIEW public._comparisons_detailed_light AS
+CREATE OR REPLACE VIEW public._comparisons_detailed_light_test AS
 WITH
--- ====== Constantes ======
-const AS (
-  SELECT 0.05113::double precision AS iee_factor
-),
 
 -- ====== Base con tarifas candidatas ======
 base AS (
@@ -104,21 +100,21 @@ m_calc AS (
   SELECT
     b.*,
 
-    -- Totales “nuevo” (energia + potencia) por mes, pre-IVA
-    (COALESCE(b.consumption_p1,0)*COALESCE(b.price_cp1,0) +
-     COALESCE(b.consumption_p2,0)*COALESCE(b.price_cp2,0) +
-     COALESCE(b.consumption_p3,0)*COALESCE(b.price_cp3,0))                 AS m_consumo,
+    -- Totales “nuevo” (energia + potencia) por mes, pre-IVA (para trazabilidad)
+    (COALESCE(b.consumption_p1,0::real)*COALESCE(b.price_cp1,0::real) +
+     COALESCE(b.consumption_p2,0::real)*COALESCE(b.price_cp2,0::real) +
+     COALESCE(b.consumption_p3,0::real)*COALESCE(b.price_cp3,0::real))                 AS m_consumo,
 
-    (COALESCE(b.power_p1,0)*COALESCE(b.price_pp1,0)*COALESCE(b.power_days,0)::double precision +
-     COALESCE(b.power_p2,0)*COALESCE(b.price_pp2,0)*COALESCE(b.power_days,0)::double precision) AS m_potencia,
+    (COALESCE(b.power_p1,0::real)*COALESCE(b.price_pp1,0::real)*COALESCE(b.power_days,0::double precision) +
+     COALESCE(b.power_p2,0::real)*COALESCE(b.price_pp2,0::real)*COALESCE(b.power_days,0::double precision)) AS m_potencia,
 
     -- Totales mensuales por bloque (para trazabilidad)
-    (COALESCE(b.consumption_p1,0)*COALESCE(b.price_cp1,0) +
-     COALESCE(b.consumption_p2,0)*COALESCE(b.price_cp2,0) +
-     COALESCE(b.consumption_p3,0)*COALESCE(b.price_cp3,0))                 AS total_consumption_price,
+    (COALESCE(b.consumption_p1,0::real)*COALESCE(b.price_cp1,0::real) +
+     COALESCE(b.consumption_p2,0::real)*COALESCE(b.price_cp2,0::real) +
+     COALESCE(b.consumption_p3,0::real)*COALESCE(b.price_cp3,0::real))                 AS total_consumption_price,
 
-    (COALESCE(b.power_p1,0)*COALESCE(b.price_pp1,0)*COALESCE(b.power_days,0)::double precision +
-     COALESCE(b.power_p2,0)*COALESCE(b.price_pp2,0)*COALESCE(b.power_days,0)::double precision) AS total_power_price,
+    (COALESCE(b.power_p1,0::real)*COALESCE(b.price_pp1,0::real)*COALESCE(b.power_days,0::double precision) +
+     COALESCE(b.power_p2,0::real)*COALESCE(b.price_pp2,0::real)*COALESCE(b.power_days,0::double precision)) AS total_power_price,
 
     COALESCE(b.surpluses,0)*COALESCE(b.price_surpluses,0)                   AS total_surpluses_price
   FROM base b
@@ -128,38 +124,39 @@ m_calc AS (
 tot AS (
   SELECT
     m.*,
-    c.iee_factor,
 
-    -- Precio mensual NUEVO con IEE, sin vat aún (pre-IVA)
-    (m.m_potencia + m.m_consumo - m.total_surpluses_price)                           AS new_total_price,
+    -- Precio mensual NUEVO (pre-IVA, sin IEE): exactamente como antes
+    (
+      COALESCE(m.power_p1, 0::real) * COALESCE(m.price_pp1, 0::real) * COALESCE(m.power_days, 0)::double precision +
+      COALESCE(m.power_p2, 0::real) * COALESCE(m.price_pp2, 0::real) * COALESCE(m.power_days, 0)::double precision +
+      COALESCE(m.consumption_p1, 0::real) * COALESCE(m.price_cp1, 0::real) +
+      COALESCE(m.consumption_p2, 0::real) * COALESCE(m.price_cp2, 0::real) +
+      COALESCE(m.consumption_p3, 0::real) * COALESCE(m.price_cp3, 0::real) -
+      COALESCE(m.surpluses, 0::real) * COALESCE(m.price_surpluses, 0::real)
+    ) AS new_total_price,
 
     -- IEE mensual (para columna iee_monthly)
-    (m.m_consumo + m.m_potencia) * c.iee_factor                                      AS iee_monthly,
-
-    -- Precio mensual NUEVO con IEE + VAT
-    ((m.m_potencia + m.m_consumo - m.total_surpluses_price) * (1 + c.iee_factor)
-      + COALESCE(m.equipment_rental,0)) * (1 + COALESCE(m."VAT",0))                  AS new_total_price_with_vat,
+    (m.m_consumo + m.m_potencia) * 0.05113::double precision                                     AS iee_monthly,
 
     -- Precio anual NUEVO con IEE + VAT
     (
-      COALESCE(m.anual_consumption_p1,0)*COALESCE(m.price_cp1,0) +
-      COALESCE(m.anual_consumption_p2,0)*COALESCE(m.price_cp2,0) +
-      COALESCE(m.anual_consumption_p3,0)*COALESCE(m.price_cp3,0) +
-      COALESCE(NULLIF(m.power_p1,0::double precision),1::real)*COALESCE(m.price_pp1,0)*365::double precision +
-      COALESCE(m.power_p2,0)*COALESCE(m.price_pp2,0)*365::double precision
-    ) * (1 + c.iee_factor) * (1 + COALESCE(m."VAT",0))                                AS new_total_yearly_price_with_vat,
+      COALESCE(m.anual_consumption_p1,0::real)*COALESCE(m.price_cp1,0::real) +
+      COALESCE(m.anual_consumption_p2,0::real)*COALESCE(m.price_cp2,0::real) +
+      COALESCE(m.anual_consumption_p3,0::real)*COALESCE(m.price_cp3,0::real) +
+      COALESCE(NULLIF(m.power_p1,0::double precision),1::real)*COALESCE(m.price_pp1,0::real)*365::double precision +
+      COALESCE(m.power_p2,0::real)*COALESCE(m.price_pp2,0::real)*365::double precision
+    ) * (1 + 0.05113::double precision) * (1 + COALESCE(m."VAT",0::real))                        AS new_total_yearly_price_with_vat,
 
     -- Precio anual ACTUAL con IEE + VAT (para savings_yearly)
     (
-      COALESCE(m.anual_consumption_p1,0)*COALESCE(m."precio_kwh_P1",0) +
-      COALESCE(m.anual_consumption_p2,0)*COALESCE(m."precio_kwh_P2",0) +
-      COALESCE(m.anual_consumption_p3,0)*COALESCE(m."precio_kwh_P3",0) +
-      COALESCE(NULLIF(m.power_p1,0::double precision),1::real)*COALESCE(m."precio_kw_P1",0)*365::double precision +
-      COALESCE(m.power_p2,0)*COALESCE(m."precio_kw_P2",0)*365::double precision
+      COALESCE(m.anual_consumption_p1,0::real)*COALESCE(m."precio_kwh_P1",0::real) +
+      COALESCE(m.anual_consumption_p2,0::real)*COALESCE(m."precio_kwh_P2",0::real) +
+      COALESCE(m.anual_consumption_p3,0::real)*COALESCE(m."precio_kwh_P3",0::real) +
+      COALESCE(NULLIF(m.power_p1,0::double precision),1::real)*COALESCE(m."precio_kw_P1",0::real)*365::double precision +
+      COALESCE(m.power_p2,0::real)*COALESCE(m."precio_kw_P2",0::real)*365::double precision
       - COALESCE(m.surpluses,0) * 182.5::double precision / NULLIF(m.power_days::double precision,0) * COALESCE(m.autoconsumo_precio,0)
-    ) * (1 + c.iee_factor) * (1 + COALESCE(m."VAT",0))                                 AS current_total_yearly_price_with_vat
+    ) * (1 + 0.05113::double precision) * (1 + COALESCE(m."VAT",0::real))                         AS current_total_yearly_price_with_vat
   FROM m_calc m
-  CROSS JOIN const c
 ),
 
 -- ====== CRS y ahorros ======
@@ -168,26 +165,31 @@ with_crs AS (
     t.*,
     crs.id AS crs_id,
     -- CRS total (solo P1..P3 energía y P1..P2 potencia en light)
-    COALESCE(t.anual_consumption_p1,0)*COALESCE(crs.crs_cp1,0) +
-    COALESCE(t.anual_consumption_p2,0)*COALESCE(crs.crs_cp2,0) +
-    COALESCE(t.anual_consumption_p3,0)*COALESCE(crs.crs_cp3,0) +
-    COALESCE(t.power_p1,0)*COALESCE(crs.crs_pp1,0) +
-    COALESCE(t.power_p2,0)*COALESCE(crs.crs_pp2,0) +
-    COALESCE(crs.fixed_crs,0)                                                         AS total_crs,
+    COALESCE(t.anual_consumption_p1,0::real)*COALESCE(crs.crs_cp1,0::real) +
+    COALESCE(t.anual_consumption_p2,0::real)*COALESCE(crs.crs_cp2,0::real) +
+    COALESCE(t.anual_consumption_p3,0::real)*COALESCE(crs.crs_cp3,0::real) +
+    COALESCE(t.power_p1,0::real)*COALESCE(crs.crs_pp1,0::real) +
+    COALESCE(t.power_p2,0::real)*COALESCE(crs.crs_pp2,0::real) +
+    COALESCE(crs.fixed_crs,0::real)                                                         AS total_crs,
 
-    -- Ahorro mensual (mismo criterio que gas/3_0: actual mensual - nuevo mensual)
+    -- Ahorro mensual (actual mensual - nuevo mensual)
     CASE
-      WHEN t.new_company IS NOT NULL
-        THEN COALESCE(t.current_total_invoice,0)::double precision - t.new_total_price_with_vat
+      WHEN t.new_company IS NOT NULL THEN
+        COALESCE(t.current_total_invoice, 0::real)::double precision
+        -
+        (
+          (COALESCE(t.new_total_price, 0::double precision) * 1.05113::double precision
+            + COALESCE(t.equipment_rental, 0::real))
+          * (1::double precision + COALESCE(t."VAT", 0::real))
+        )
       ELSE 0.0::double precision
     END                                                                                AS savings,
 
-    -- Ahorro anual (tarifa plana vs normal)
+    -- Ahorro anual
     CASE
       WHEN t.tarifa_plana = TRUE THEN
         t.current_total_invoice * (365.0 / NULLIF(t.power_days::numeric,0))::double precision
-        -
-        t.new_total_yearly_price_with_vat
+        - t.new_total_yearly_price_with_vat
       WHEN t.new_company IS NOT NULL THEN
         t.current_total_yearly_price_with_vat - t.new_total_yearly_price_with_vat
       ELSE 0.0::double precision
@@ -195,8 +197,8 @@ with_crs AS (
   FROM tot t
   LEFT JOIN comparison_rates_crs crs
     ON crs.comparison_rate_id = t.new_rate_id
-   AND (crs.min_kw_anual IS NULL OR (COALESCE(t.anual_consumption_p1,0)+COALESCE(t.anual_consumption_p2,0)+COALESCE(t.anual_consumption_p3,0)) >= crs.min_kw_anual)
-   AND (crs.max_kw_anual IS NULL OR (COALESCE(t.anual_consumption_p1,0)+COALESCE(t.anual_consumption_p2,0)+COALESCE(t.anual_consumption_p3,0)) <  crs.max_kw_anual)
+   AND (crs.min_kw_anual IS NULL OR (COALESCE(t.anual_consumption_p1,0::real)+COALESCE(t.anual_consumption_p2,0::real)+COALESCE(t.anual_consumption_p3,0::real)) >= crs.min_kw_anual)
+   AND (crs.max_kw_anual IS NULL OR (COALESCE(t.anual_consumption_p1,0::real)+COALESCE(t.anual_consumption_p2,0::real)+COALESCE(t.anual_consumption_p3,0::real)) <  crs.max_kw_anual)
    AND (crs.min_power   IS NULL OR t.power_p1 >= crs.min_power)
    AND (crs.max_power   IS NULL OR t.power_p1 <  crs.max_power)
 ),
@@ -207,16 +209,16 @@ ranked AS (
     w.*,
     CASE
       WHEN w.new_company IS NOT NULL AND w.savings_yearly > 0
-        THEN w.savings_yearly + COALESCE(w.total_crs,0)::double precision * 4.0
-      ELSE w.savings_yearly + COALESCE(w.total_crs,0)::double precision * 4.0
+        THEN w.savings_yearly + COALESCE(w.total_crs,0::real)::double precision * 4.0
+      ELSE w.savings_yearly + COALESCE(w.total_crs,0::real)::double precision * 4.0
     END AS ranked_crs,
     ROW_NUMBER() OVER (
       PARTITION BY w.id
       ORDER BY
         CASE
           WHEN w.new_company IS NOT NULL AND w.savings_yearly > 0
-            THEN w.savings_yearly + COALESCE(w.total_crs,0)::double precision * 4.0
-          ELSE w.savings_yearly + COALESCE(w.total_crs,0)::double precision * 4.0
+            THEN w.savings_yearly + COALESCE(w.total_crs,0::real)::double precision * 4.0
+          ELSE w.savings_yearly + COALESCE(w.total_crs,0::real)::double precision * 4.0
         END DESC
     ) AS rank
   FROM with_crs w
@@ -232,13 +234,13 @@ with_advisor AS (
       ELSE us.supervisors
     END                       AS supervisors,
     u.email                   AS advisor_email,
-    u.name            AS advisor_display_name
+    u.name                    AS advisor_display_name
   FROM ranked r
   LEFT JOIN _users_supervisors us ON r.advisor_id = us.user_id
   LEFT JOIN users u               ON u.user_id     = r.advisor_id
 )
 
--- ====== SELECT FINAL (orden exacto de columnas normalizado como gas/3_0) ======
+-- ====== SELECT FINAL ======
 SELECT DISTINCT
   -- Identificación y cabecera
   rc.id,
@@ -282,8 +284,8 @@ SELECT DISTINCT
   0::real AS "precio_kwh_P6",
 
   -- Totales consumo
-  (COALESCE(rc.consumption_p1,0)+COALESCE(rc.consumption_p2,0)+COALESCE(rc.consumption_p3,0))::real AS total_consumption,
-  (COALESCE(rc.anual_consumption_p1,0)+COALESCE(rc.anual_consumption_p2,0)+COALESCE(rc.anual_consumption_p3,0))::real AS total_anual_consumption,
+  (COALESCE(rc.consumption_p1,0::real)+COALESCE(rc.consumption_p2,0::real)+COALESCE(rc.consumption_p3,0::real))::real AS total_consumption,
+  (COALESCE(rc.anual_consumption_p1,0::real)+COALESCE(rc.anual_consumption_p2,0::real)+COALESCE(rc.anual_consumption_p3,0::real))::real AS total_anual_consumption,
 
   -- Potencias (normalizamos P3..P6 = 0)
   rc.power_p1,
@@ -377,16 +379,32 @@ SELECT DISTINCT
   -- IEE anual (derivado de anuales * factor)
   (
     (
-      COALESCE(rc.anual_consumption_p1,0)*COALESCE(rc.price_cp1,0) +
-      COALESCE(rc.anual_consumption_p2,0)*COALESCE(rc.price_cp2,0) +
-      COALESCE(rc.anual_consumption_p3,0)*COALESCE(rc.price_cp3,0) +
-      (COALESCE(rc.power_p1,0)*COALESCE(rc.price_pp1,0) +
-       COALESCE(rc.power_p2,0)*COALESCE(rc.price_pp2,0)) * 365::double precision
+      COALESCE(rc.anual_consumption_p1,0::real)*COALESCE(rc.price_cp1,0::real) +
+      COALESCE(rc.anual_consumption_p2,0::real)*COALESCE(rc.price_cp2,0::real) +
+      COALESCE(rc.anual_consumption_p3,0::real)*COALESCE(rc.price_cp3,0::real) +
+      (COALESCE(rc.power_p1,0::real)*COALESCE(rc.price_pp1,0::real) +
+       COALESCE(rc.power_p2,0::real)*COALESCE(rc.price_pp2,0::real)) * 365::double precision
     ) * 0.05113::double precision
   ) AS iee,
 
-  -- Precio nuevo mensual con IVA
-  rc.new_total_price_with_vat,
+  -- Precio nuevo mensual con IVA (solo aquí, según reglas de light)
+  CASE
+    WHEN rc.tarifa_plana = TRUE THEN
+      (
+        (COALESCE(rc.new_total_price, 0::double precision) * 1.05113::double precision)
+        + COALESCE(rc.equipment_rental, 0::real)
+      ) * (1::double precision + COALESCE(rc."VAT", 0::real))
+    ELSE
+      (
+        (
+          COALESCE(rc.new_total_price, 0::double precision)
+          + (COALESCE(rc.power_days, 0)::numeric * 0.012742)::double precision
+        ) * 1.05113::double precision
+        + COALESCE(rc.equipment_rental, 0::real)
+      ) * (1::double precision + COALESCE(rc."VAT", 0::real))
+    END::numeric::double precision AS new_total_price_with_vat,
+
+
   rc.new_total_yearly_price_with_vat,
 
   -- % ahorro (coherente con gas/3_0)
@@ -406,7 +424,7 @@ SELECT DISTINCT
   COALESCE(rc.temp_client_name,'')      AS client_name,
   COALESCE(rc.temp_client_last_name,'') AS client_last_name,
   u.email                               AS advisor_email,
-  u.name                        AS advisor_display_name,
+  u.name                                AS advisor_display_name,
   ARRAY[COALESCE(u.email,''::text),'All'] AS advisor_filter,
 
   -- Derivados de fecha, búsqueda y filtros

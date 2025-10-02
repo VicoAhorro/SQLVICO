@@ -1746,20 +1746,24 @@ select distinct
         (
           COALESCE(rc.new_total_price, 0::real::double precision) * 1.05113::double precision ) + COALESCE(rc.equipment_rental)
       ) * (1::double precision + COALESCE(rc."VAT", 0::real))
-      when rc.type = 'light'::text then 
+
+    when rc.type = 'light'::text then 
+    (
       (
-        (
-          COALESCE(rc.new_total_price, 0::real::double precision) + (COALESCE(rc.days)::numeric * 0.012742)::double precision
-        ) * 1.05113::double precision + COALESCE(rc.equipment_rental)
-      ) * (1::double precision + COALESCE(rc."VAT", 0::real))
-      when rc.type = '3_0'::text then 
-      (
-        COALESCE(rc.new_total_price, 0::real::double precision) * 1.05113::double precision + COALESCE(rc.equipment_rental)
-      ) * (1::double precision + COALESCE(rc."VAT", 0::real))
-      when rc.type = 'gas'::text then
-      (
-        COALESCE(rc.new_total_price, 0::real::double precision) + COALESCE(rc.equipment_rental)
-      ) * (1::double precision + COALESCE(rc."VAT", 0::real))
+        COALESCE(rc.new_total_price, 0::real::double precision) + (COALESCE(rc.days)::numeric * 0.012742)::double precision
+      ) * 1.05113::double precision + COALESCE(rc.equipment_rental)
+    ) * (1::double precision + COALESCE(rc."VAT", 0::real))
+
+    when rc.type = '3_0'::text then 
+    (
+      COALESCE(rc.new_total_price, 0::real::double precision) * 1.05113::double precision + COALESCE(rc.equipment_rental)
+    ) * (1::double precision + COALESCE(rc."VAT", 0::real))
+
+    when rc.type = 'gas'::text then
+    (
+      COALESCE(rc.new_total_price, 0::real::double precision) + COALESCE(rc.equipment_rental)
+    ) * (1::double precision + COALESCE(rc."VAT", 0::real))
+    
       else 0.0::double precision
     end::numeric::double precision
     else 0.0::double precision
