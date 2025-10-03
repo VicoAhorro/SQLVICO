@@ -1,4 +1,4 @@
-DROP VIEW IF EXISTS public._comparisons_detailed_3_0;
+--DROP VIEW IF EXISTS public._comparisons_detailed_3_0;
 
 CREATE OR REPLACE VIEW public._comparisons_detailed_3_0 AS
 WITH calculated_prices_3_0 AS (
@@ -74,6 +74,7 @@ WITH calculated_prices_3_0 AS (
     cr.price_pp1, cr.price_pp2, cr.price_pp3, cr.price_pp4, cr.price_pp5, cr.price_pp6,
     cr.price_cp1, cr.price_cp2, cr.price_cp3, cr.price_cp4, cr.price_cp5, cr.price_cp6,
     cr.price_surpluses,
+    cr.has_permanence,
 
     (COALESCE(c30.power_p1,0)*COALESCE(cr.price_pp1,0)*COALESCE(c30.power_days,0))::double precision +
     (COALESCE(c30.power_p2,0)*COALESCE(cr.price_pp2,0)*COALESCE(c30.power_days,0))::double precision +
@@ -472,7 +473,12 @@ SELECT DISTINCT
   ) AS search,
   ARRAY[COALESCE(rc.company,''::text),'All'] AS company_filter,
   rc.cif,
-  rc.region
+  rc.region,
+
+    -- NUEVO: Al final del SELECT
+  0.0::numeric(8,2) AS daily_maintenance_with_vat,
+  rc.has_permanence
+  
 FROM all_comparisons_ranked rc
 LEFT JOIN _users_supervisors us ON rc.advisor_id = us.user_id
 LEFT JOIN users u               ON u.user_id     = rc.advisor_id
