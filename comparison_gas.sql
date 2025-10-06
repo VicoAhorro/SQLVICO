@@ -118,7 +118,8 @@ calculated_prices_gas AS (
     0                                             AS phone_total_anual_price,
     cg.tarifa_plana,
     cg.cif,
-    cg.region
+    cg.region,
+    cr.has_permanence
   FROM comparison_gas cg
   LEFT JOIN comparison_rates cr
     ON cr.type = 'gas'
@@ -445,7 +446,11 @@ SELECT
   )                                           AS search,
   ARRAY[COALESCE(rc.company,''::text), 'All'] AS company_filter,
   rc.cif,
-  rc.region
+  rc.region,
+
+    -- NUEVO: Al final del SELECT
+  0.0::numeric(8,2) AS daily_maintenance_with_vat,
+  rc.has_permanence
 
 FROM all_comparisons_ranked rc
 LEFT JOIN _users_supervisors us ON rc.advisor_id = us.user_id

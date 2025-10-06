@@ -1,4 +1,4 @@
-DROP VIEW IF EXISTS public._comparisons_detailed_phone;
+--DROP VIEW IF EXISTS public._comparisons_detailed_phone;
 
 CREATE OR REPLACE VIEW public._comparisons_detailed_phone AS
 WITH RECURSIVE
@@ -266,7 +266,12 @@ SELECT DISTINCT
   concat_ws(', ', rp.client_email, rp.cups) AS search,
   ARRAY[rp.company, 'All'] AS company_filter,
   FALSE AS cif,       
-  NULL::text AS region  -- texto (si en las otras es text)
+  NULL::text AS region,  -- texto (si en las otras es text),
+
+    -- NUEVO: Al final del SELECT
+  0.0::numeric(8,2) AS daily_maintenance_with_vat,
+  false as has_permanence
+  
 FROM ranked_phone rp
 LEFT JOIN _users_supervisors us ON rp.advisor_id = us.user_id
 LEFT JOIN users u               ON u.user_id     = rp.advisor_id
