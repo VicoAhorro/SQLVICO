@@ -270,7 +270,8 @@ SELECT DISTINCT
 
     -- NUEVO: Al final del SELECT
   0.0::numeric(8,2) AS daily_maintenance_with_vat,
-  false as has_permanence
+  false as has_permanence,
+  NULL::rate_mode_type AS rate_mode
   
 FROM ranked_phone rp
 LEFT JOIN _users_supervisors us ON rp.advisor_id = us.user_id

@@ -119,7 +119,8 @@ calculated_prices_gas AS (
     cg.tarifa_plana,
     cg.cif,
     cg.region,
-    cr.has_permanence
+    cr.has_permanence,
+    cr.rate_mode
   FROM comparison_gas cg
   LEFT JOIN comparison_rates cr
     ON cr.type = 'gas'
@@ -629,7 +630,8 @@ SELECT
 
     -- NUEVO: Al final del SELECT
   0.0::numeric(8,2) AS daily_maintenance_with_vat,
-  rc.has_permanence
+  rc.has_permanence,
+  rc.rate_mode
 
 FROM all_comparisons_ranked rc
 LEFT JOIN _users_supervisors us ON rc.advisor_id = us.user_id
