@@ -147,19 +147,19 @@ unified_extended_prices AS (
     crs.id AS crs_id,
 
     -- CRS total
-    COALESCE(ucp.anual_consumption_p1,0) * COALESCE(crs.crs_cp1,0) +
-    COALESCE(ucp.anual_consumption_p2,0) * COALESCE(crs.crs_cp2,0) +
-    COALESCE(ucp.anual_consumption_p3,0) * COALESCE(crs.crs_cp3,0) +
-    COALESCE(ucp.anual_consumption_p4,0) * COALESCE(crs.crs_cp4,0) +
-    COALESCE(ucp.anual_consumption_p5,0) * COALESCE(crs.crs_cp5,0) +
-    COALESCE(ucp.anual_consumption_p6,0) * COALESCE(crs.crs_cp6,0) +
-    COALESCE(ucp.power_p1,0) * COALESCE(crs.crs_pp1,0) +
-    COALESCE(ucp.power_p2,0) * COALESCE(crs.crs_pp2,0) +
-    COALESCE(ucp.power_p3,0) * COALESCE(crs.crs_pp3,0) +
-    COALESCE(ucp.power_p4,0) * COALESCE(crs.crs_pp4,0) +
-    COALESCE(ucp.power_p5,0) * COALESCE(crs.crs_pp5,0) +
-    COALESCE(ucp.power_p6,0) * COALESCE(crs.crs_pp6,0) +
-    COALESCE(crs.fixed_crs,0) AS total_crs,
+    COALESCE(ucp.anual_consumption_p1,0::real) * COALESCE(crs.crs_cp1,0::real) +
+    COALESCE(ucp.anual_consumption_p2,0::real) * COALESCE(crs.crs_cp2,0::real) +
+    COALESCE(ucp.anual_consumption_p3,0::real) * COALESCE(crs.crs_cp3,0::real) +
+    COALESCE(ucp.anual_consumption_p4,0::real) * COALESCE(crs.crs_cp4,0::real) +
+    COALESCE(ucp.anual_consumption_p5,0::real) * COALESCE(crs.crs_cp5,0::real) +
+    COALESCE(ucp.anual_consumption_p6,0::real) * COALESCE(crs.crs_cp6,0::real) +
+    COALESCE(ucp.power_p1,0::real) * COALESCE(crs.crs_pp1,0::real) +
+    COALESCE(ucp.power_p2,0::real) * COALESCE(crs.crs_pp2,0::real) +
+    COALESCE(ucp.power_p3,0::real) * COALESCE(crs.crs_pp3,0::real) +
+    COALESCE(ucp.power_p4,0::real) * COALESCE(crs.crs_pp4,0::real) +
+    COALESCE(ucp.power_p5,0::real) * COALESCE(crs.crs_pp5,0::real) +
+    COALESCE(ucp.power_p6,0::real) * COALESCE(crs.crs_pp6,0::real) +
+    COALESCE(crs.fixed_crs,0::real) AS total_crs,
 
     -- Auxiliares
     v.*,
@@ -184,42 +184,42 @@ unified_extended_prices AS (
 
   CROSS JOIN LATERAL (
     SELECT
-      COALESCE(ucp.anual_consumption_p1,0) * COALESCE(ucp."precio_kwh_P1",0) +
-      COALESCE(ucp.anual_consumption_p2,0) * COALESCE(ucp."precio_kwh_P2",0) +
-      COALESCE(ucp.anual_consumption_p3,0) * COALESCE(ucp."precio_kwh_P3",0) +
-      COALESCE(ucp.anual_consumption_p4,0) * COALESCE(ucp."precio_kwh_P4",0) +
-      COALESCE(ucp.anual_consumption_p5,0) * COALESCE(ucp."precio_kwh_P5",0) +
-      COALESCE(ucp.anual_consumption_p6,0) * COALESCE(ucp."precio_kwh_P6",0)
+      COALESCE(ucp.anual_consumption_p1,0::real) * COALESCE(ucp."precio_kwh_P1",0::real) +
+      COALESCE(ucp.anual_consumption_p2,0::real) * COALESCE(ucp."precio_kwh_P2",0::real) +
+      COALESCE(ucp.anual_consumption_p3,0::real) * COALESCE(ucp."precio_kwh_P3",0::real) +
+      COALESCE(ucp.anual_consumption_p4,0::real) * COALESCE(ucp."precio_kwh_P4",0::real) +
+      COALESCE(ucp.anual_consumption_p5,0::real) * COALESCE(ucp."precio_kwh_P5",0::real) +
+      COALESCE(ucp.anual_consumption_p6,0::real) * COALESCE(ucp."precio_kwh_P6",0::real)
       AS annual_new_energy_pre_vat
   ) a1
 
   CROSS JOIN LATERAL (
     SELECT
-      COALESCE(ucp.anual_consumption_p1,0) * COALESCE(ucp.price_cp1,0) +
-      COALESCE(ucp.anual_consumption_p2,0) * COALESCE(ucp.price_cp2,0) +
-      COALESCE(ucp.anual_consumption_p3,0) * COALESCE(ucp.price_cp3,0) +
-      COALESCE(ucp.anual_consumption_p4,0) * COALESCE(ucp.price_cp4,0) +
-      COALESCE(ucp.anual_consumption_p5,0) * COALESCE(ucp.price_cp5,0) +
-      COALESCE(ucp.anual_consumption_p6,0) * COALESCE(ucp.price_cp6,0)
+      COALESCE(ucp.anual_consumption_p1,0::real) * COALESCE(ucp.price_cp1,0::real) +
+      COALESCE(ucp.anual_consumption_p2,0::real) * COALESCE(ucp.price_cp2,0::real) +
+      COALESCE(ucp.anual_consumption_p3,0::real) * COALESCE(ucp.price_cp3,0::real) +
+      COALESCE(ucp.anual_consumption_p4,0::real) * COALESCE(ucp.price_cp4,0::real) +
+      COALESCE(ucp.anual_consumption_p5,0::real) * COALESCE(ucp.price_cp5,0::real) +
+      COALESCE(ucp.anual_consumption_p6,0::real) * COALESCE(ucp.price_cp6,0::real)
       AS annual_old_energy_pre_vat
   ) a2
 
   CROSS JOIN LATERAL (
     SELECT
-      (pwr.power1_or_1 * COALESCE(ucp."precio_kw_P1",0) * 365::double precision) +
-      (pwr.p2           * COALESCE(ucp."precio_kw_P2",0) * 365::double precision) +
-      (pwr.p3           * COALESCE(ucp."precio_kw_P3",0) * 365::double precision) +
-      (pwr.p4           * COALESCE(ucp."precio_kw_P4",0) * 365::double precision) +
-      (pwr.p5           * COALESCE(ucp."precio_kw_P5",0) * 365::double precision) +
-      (pwr.p6           * COALESCE(ucp."precio_kw_P6",0) * 365::double precision)
+      (pwr.power1_or_1 * COALESCE(ucp."precio_kw_P1",0::real) * 365::double precision) +
+      (pwr.p2           * COALESCE(ucp."precio_kw_P2",0::real) * 365::double precision) +
+      (pwr.p3           * COALESCE(ucp."precio_kw_P3",0::real) * 365::double precision) +
+      (pwr.p4           * COALESCE(ucp."precio_kw_P4",0::real) * 365::double precision) +
+      (pwr.p5           * COALESCE(ucp."precio_kw_P5",0::real) * 365::double precision) +
+      (pwr.p6           * COALESCE(ucp."precio_kw_P6",0::real) * 365::double precision)
       AS annual_new_power_pre_vat,
 
-      (COALESCE(NULLIF(ucp.power_p1,0::double precision),1::real) * COALESCE(ucp.price_pp1,0) * 365::double precision) +
-      (COALESCE(ucp.power_p2,0) * COALESCE(ucp.price_pp2,0) * 365::double precision) +
-      (COALESCE(ucp.power_p3,0) * COALESCE(ucp.price_pp3,0) * 365::double precision) +
-      (COALESCE(ucp.power_p4,0) * COALESCE(ucp.price_pp4,0) * 365::double precision) +
-      (COALESCE(ucp.power_p5,0) * COALESCE(ucp.price_pp5,0) * 365::double precision) +
-      (COALESCE(ucp.power_p6,0) * COALESCE(ucp.price_pp6,0) * 365::double precision)
+      (COALESCE(NULLIF(ucp.power_p1,0::double precision),1::real) * COALESCE(ucp.price_pp1,0::real) * 365::double precision) +
+      (COALESCE(ucp.power_p2,0::real) * COALESCE(ucp.price_pp2,0::real) * 365::double precision) +
+      (COALESCE(ucp.power_p3,0::real) * COALESCE(ucp.price_pp3,0::real) * 365::double precision) +
+      (COALESCE(ucp.power_p4,0::real) * COALESCE(ucp.price_pp4,0::real) * 365::double precision) +
+      (COALESCE(ucp.power_p5,0::real) * COALESCE(ucp.price_pp5,0::real) * 365::double precision) +
+      (COALESCE(ucp.power_p6,0::real) * COALESCE(ucp.price_pp6,0::real) * 365::double precision)
       AS annual_old_power_pre_vat
   ) pwr_year
 
@@ -231,12 +231,12 @@ unified_extended_prices AS (
 
   CROSS JOIN LATERAL (
     SELECT
-      base.annual_new_pre_vat * (1::double precision + COALESCE(ucp."VAT",0)) AS annual_new_with_vat,
-      base.annual_old_pre_vat * (1::double precision + COALESCE(ucp."VAT",0)) AS annual_old_with_vat,
+      base.annual_new_pre_vat * (1::double precision + COALESCE(ucp."VAT",0::real)) AS annual_new_with_vat,
+      base.annual_old_pre_vat * (1::double precision + COALESCE(ucp."VAT",0::real)) AS annual_old_with_vat,
 
       -- Mensual nuevo con IVA
       (COALESCE(ucp.new_total_price,0::double precision) + COALESCE(ucp.equipment_rental,0))
-        * (1::double precision + COALESCE(ucp."VAT",0)) AS monthly_new_with_vat,
+        * (1::double precision + COALESCE(ucp."VAT",0::real)) AS monthly_new_with_vat,
 
       -- Actual mensual anualizado (tarifa plana)
       COALESCE(ucp.current_total_invoice,0) * (365.0 / NULLIF(ucp.days::numeric,0)) AS current_monthly_annualized
@@ -246,14 +246,14 @@ unified_extended_prices AS (
     SELECT
       CASE
         WHEN ucp.tarifa_plana = TRUE THEN
-          COALESCE(ucp.current_total_invoice,0) * (365.0 / NULLIF(ucp.days::numeric,0))::double precision
+          COALESCE(ucp.current_total_invoice,0::real) * (365.0 / NULLIF(ucp.days::numeric,0))::double precision
           -
           (
-            COALESCE(ucp.anual_consumption_p1,0) * (COALESCE(ucp.price_cp1,0) + 0.00234)
-            + COALESCE(NULLIF(ucp.power_p1,0::double precision),1::real) * COALESCE(ucp.price_pp1,0) * 365::double precision
-            + COALESCE(NULLIF(ucp.power_p2,0::double precision),1::real) * COALESCE(ucp.price_pp2,0) * 365::double precision
+            COALESCE(ucp.anual_consumption_p1,0::real) * (COALESCE(ucp.price_cp1,0::real) + 0.00234)
+            + COALESCE(NULLIF(ucp.power_p1,0::double precision),1::real) * COALESCE(ucp.price_pp1,0::real) * 365::double precision
+            + COALESCE(NULLIF(ucp.power_p2,0::double precision),1::real) * COALESCE(ucp.price_pp2,0::real) * 365::double precision
           )
-          * (1::double precision + COALESCE(ucp."VAT",0))
+          * (1::double precision + COALESCE(ucp."VAT",0::real))
 
         WHEN ucp.new_company IS NOT NULL THEN
           v.annual_new_with_vat - v.annual_old_with_vat
@@ -410,20 +410,199 @@ SELECT
   0.0::double precision AS iee,         -- GAS = 0
 
   -- (9) Nuevos importes con IVA y % ahorro
-  rc.monthly_new_with_vat AS new_total_price_with_vat,
-  rc.annual_new_with_vat  AS new_total_yearly_price_with_vat,
+    -- importes con IVA directos
+  (
+    (
+      (COALESCE(rc.days::real, 0) * COALESCE(rc.price_pp1, 0::real))
+      + (COALESCE(rc.consumption_p1, 0::real) * (COALESCE(rc.price_cp1, 0::real) + 0.00234))
+    )::double precision
+    + COALESCE(rc.equipment_rental, 0::double precision)
+  ) * (1::double precision + COALESCE(rc."VAT", 0::real)) AS new_total_price_with_vat,
+
+  (
+    COALESCE(rc.anual_consumption_p1, 0::real) * COALESCE(rc.price_cp1, 0::real)
+  ) * (1::double precision + COALESCE(rc."VAT", 0::real)) AS new_total_yearly_price_with_vat,
+
   CASE
-    WHEN rc.tarifa_plana = TRUE THEN
+    when rc.type = 'phone'::text then (
+      rc.current_total_invoice * 12::double precision - COALESCE(
+        rc.phone_total_anual_price::double precision,
+        0.0::double precision
+      )
+    ) / NULLIF(
+      rc.current_total_invoice * 12::double precision,
+      0.0::double precision
+    )
+    WHEN rc.tarifa_plana = TRUE and rc.type = 'light' THEN
+     (
+      (rc.current_total_invoice * (365.0 / rc.days)) -
+      ( (
+            (COALESCE(rc.anual_consumption_p1, 0) * COALESCE(rc.price_cp1, 0)) +
+            (COALESCE(rc.anual_consumption_p2, 0) * COALESCE(rc.price_cp2, 0)) +
+            (COALESCE(rc.anual_consumption_p3, 0) * COALESCE(rc.price_cp3, 0)) +
+            (COALESCE(rc.power_p1, 0) * COALESCE(rc.price_pp1, 0) * 365) +
+            (COALESCE(rc.power_p2, 0) * COALESCE(rc.price_pp2, 0) * 365)
+          ) * 1.05113) 
+      * (1 + COALESCE(rc."VAT", 0.0))
+    ) / (rc.current_total_invoice * (365.0 / rc.days))
+
+    WHEN rc.tarifa_plana = TRUE and rc.type = 'gas' THEN
+     (
+      (rc.current_total_invoice * (365.0 / rc.days)) -
+      ( (
+            (COALESCE(rc.anual_consumption_p1, 0) * (COALESCE(rc.price_cp1, 0))+0.00234) +
+            (COALESCE(rc.price_pp1, 0) * 365)) * (1 + COALESCE(rc."VAT", 0.0))
+    )) / (rc.current_total_invoice * (365.0 / rc.days))
+
+    when rc.new_company is not null and rc.type <> '3_0'::text then 
+    (
       (
-        (rc.current_total_invoice * (365.0 / NULLIF(rc.days,0))) -
-        ( (COALESCE(rc.anual_consumption_p1,0) * (COALESCE(rc.price_cp1,0) + 0.00234))
-          + (COALESCE(rc.price_pp1,0) * 365) )
-      ) / NULLIF((rc.current_total_invoice * (365.0 / NULLIF(rc.days,0))), 0.0)
-    WHEN rc.new_company IS NOT NULL THEN
-      (rc.annual_new_with_vat - rc.annual_old_with_vat)
-      / NULLIF(rc.annual_new_with_vat, 0.0::double precision)
-    ELSE 0.0::double precision
-  END AS saving_percentage,
+        COALESCE(rc.anual_consumption_p1, 0::real) * COALESCE(rc."precio_kwh_P1", 0::real) +
+        COALESCE(rc.anual_consumption_p2, 0::real) * COALESCE(rc."precio_kwh_P2", 0::real) +
+        COALESCE(rc.anual_consumption_p3, 0::real) * COALESCE(rc."precio_kwh_P3", 0::real) +
+        COALESCE(rc.anual_consumption_p4, 0::real) * COALESCE(rc."precio_kwh_P4", 0::real) +
+        COALESCE(rc.anual_consumption_p5, 0::real) * COALESCE(rc."precio_kwh_P5", 0::real) +
+        COALESCE(rc.anual_consumption_p6, 0::real) * COALESCE(rc."precio_kwh_P6", 0::real) +
+        COALESCE(NULLIF(rc.power_p1, 0::double precision), 1::real) * COALESCE(rc."precio_kw_P1", 0::real) * 365::double precision +
+        COALESCE(rc.power_p2, 0::real) * COALESCE(rc."precio_kw_P2", 0::real) * 365::double precision +
+        COALESCE(rc.power_p3, 0::real) * COALESCE(rc."precio_kw_P3", 0::real) * 365::double precision +
+        COALESCE(rc.power_p4, 0::real) * COALESCE(rc."precio_kw_P4", 0::real) * 365::double precision +
+        COALESCE(rc.power_p5, 0::real) * COALESCE(rc."precio_kw_P5", 0::real) * 365::double precision +
+        COALESCE(rc.power_p6, 0::real) * COALESCE(rc."precio_kw_P6", 0::real) * 365::double precision 
+            - 
+        COALESCE(rc.surpluses, 0::real) * 182.5::double precision / case
+          when COALESCE(rc.days::real, 0::real) = 0::double precision then 182.5
+          else rc.days::numeric
+        end::double precision * COALESCE(rc.autoconsumo_precio, 0::real)
+      ) 
+      * case
+        when rc.type = any (array['light'::text, '3_0'::text]) then 1.05113::double precision
+        else 1.0::double precision
+      end 
+      * (1::double precision + COALESCE(rc."VAT", 0::real)) 
+      - 
+      (
+        COALESCE(rc.anual_consumption_p1, 0::real) * COALESCE(rc.price_cp1, 0::real) +
+        COALESCE(rc.anual_consumption_p2, 0::real) * COALESCE(rc.price_cp2, 0::real) +
+        COALESCE(rc.anual_consumption_p3, 0::real) * COALESCE(rc.price_cp3, 0::real) +
+        COALESCE(rc.anual_consumption_p4, 0::real) * COALESCE(rc.price_cp4, 0::real) +
+        COALESCE(rc.anual_consumption_p5, 0::real) * COALESCE(rc.price_cp5, 0::real) +
+        COALESCE(rc.anual_consumption_p6, 0::real) * COALESCE(rc.price_cp6, 0::real) +
+        COALESCE(NULLIF(rc.power_p1, 0::double precision), 1::real) * COALESCE(rc.price_pp1, 0::real) * 365::double precision +
+        COALESCE(rc.power_p2, 0::real) * COALESCE(rc.price_pp2, 0::real) * 365::double precision +
+        COALESCE(rc.power_p3, 0::real) * COALESCE(rc.price_pp3, 0::real) * 365::double precision +
+        COALESCE(rc.power_p4, 0::real) * COALESCE(rc.price_pp4, 0::real) * 365::double precision +
+        COALESCE(rc.power_p5, 0::real) * COALESCE(rc.price_pp5, 0::real) * 365::double precision +
+        COALESCE(rc.power_p6, 0::real) * COALESCE(rc.price_pp6, 0::real) * 365::double precision 
+        - COALESCE(rc.surpluses, 0::real) * 182.5::double precision 
+        / 
+        case
+          when COALESCE(rc.days::real, 0::real) = 0::double precision then 182.5
+          else rc.days::numeric
+        end::double precision * COALESCE(rc.price_surpluses, 0::real)
+      ) 
+      *
+        case
+          when rc.type = any (array['light'::text, '3_0'::text]) then 1.05113::double precision
+        else 1.0::double precision
+      end 
+      * (1::double precision + COALESCE(rc."VAT", 0::real))
+    ) / NULLIF(
+                (
+                  COALESCE(rc.anual_consumption_p1, 0::real) * COALESCE(rc."precio_kwh_P1", 0::real) +
+                  COALESCE(rc.anual_consumption_p2, 0::real) * COALESCE(rc."precio_kwh_P2", 0::real) +
+                  COALESCE(rc.anual_consumption_p3, 0::real) * COALESCE(rc."precio_kwh_P3", 0::real) + 
+                  COALESCE(rc.anual_consumption_p4, 0::real) * COALESCE(rc."precio_kwh_P4", 0::real) + 
+                  COALESCE(rc.anual_consumption_p5, 0::real) * COALESCE(rc."precio_kwh_P5", 0::real) + 
+                  COALESCE(rc.anual_consumption_p6, 0::real) * COALESCE(rc."precio_kwh_P6", 0::real) + 
+                  COALESCE(NULLIF(rc.power_p1, 0::double precision), 1::real) * COALESCE(rc."precio_kw_P1", 0::real) * 365::double precision + 
+                  COALESCE(rc.power_p2, 0::real) * COALESCE(rc."precio_kw_P2", 0::real) * 365::double precision +
+                  COALESCE(rc.power_p3, 0::real) * COALESCE(rc."precio_kw_P3", 0::real) * 365::double precision + 
+                  COALESCE(rc.power_p4, 0::real) * COALESCE(rc."precio_kw_P4", 0::real) * 365::double precision +
+                  COALESCE(rc.power_p5, 0::real) * COALESCE(rc."precio_kw_P5", 0::real) * 365::double precision +
+                  COALESCE(rc.power_p6, 0::real) * COALESCE(rc."precio_kw_P6", 0::real) * 365::double precision - 
+                  COALESCE(rc.surpluses, 0::real) * 182.5::double precision 
+                  /
+                  case
+                  when COALESCE(rc.days::real, 0::real) = 0::double precision then 182.5
+                    else rc.days::numeric
+                  end::double precision 
+                  * COALESCE(rc.autoconsumo_precio, 0::real)
+                )
+                * 
+                case
+                  when rc.type = any (array['light'::text, '3_0'::text]) then 1.05113::double precision
+                  else 1.0::double precision
+                end 
+                * (1::double precision + COALESCE(rc."VAT", 0::real)), 0::double precision
+              )
+    when rc.new_company is not null and rc.type = '3_0'::text then 
+    (
+      (
+        COALESCE(rc.anual_consumption_p1, 0::real) * COALESCE(rc."precio_kwh_P1", 0::real) +
+        COALESCE(rc.anual_consumption_p2, 0::real) * COALESCE(rc."precio_kwh_P2", 0::real) +
+        COALESCE(rc.anual_consumption_p3, 0::real) * COALESCE(rc."precio_kwh_P3", 0::real) +
+        COALESCE(rc.anual_consumption_p4, 0::real) * COALESCE(rc."precio_kwh_P4", 0::real) +
+        COALESCE(rc.anual_consumption_p5, 0::real) * COALESCE(rc."precio_kwh_P5", 0::real) +
+        COALESCE(rc.anual_consumption_p6, 0::real) * COALESCE(rc."precio_kwh_P6", 0::real) +
+        COALESCE(NULLIF(rc.power_p1, 0::double precision), 1::real) * COALESCE(rc."precio_kw_P1", 0::real) * 365::double precision +
+        COALESCE(rc.power_p2, 0::real) * COALESCE(rc."precio_kw_P2", 0::real) * 365::double precision +
+        COALESCE(rc.power_p3, 0::real) * COALESCE(rc."precio_kw_P3", 0::real) * 365::double precision +
+        COALESCE(rc.power_p4, 0::real) * COALESCE(rc."precio_kw_P4", 0::real) * 365::double precision +
+        COALESCE(rc.power_p5, 0::real) * COALESCE(rc."precio_kw_P5", 0::real) * 365::double precision +
+        COALESCE(rc.power_p6, 0::real) * COALESCE(rc."precio_kw_P6", 0::real) * 365::double precision -
+        COALESCE(rc.surpluses, 0::real) * 182.5::double precision 
+        / 
+        case
+          when COALESCE(rc.days::real, 0::real) = 0::double precision then 182.5
+          else rc.days::numeric
+        end::double precision * COALESCE(rc.autoconsumo_precio, 0::real)
+      ) 
+      * case
+         when rc.type = any (array['light'::text, '3_0'::text]) then 1.05113::double precision
+        else 1.0::double precision
+      end * (1::double precision + COALESCE(rc."VAT", 0::real)) - 
+        (
+          COALESCE(rc.total_consumption_price, 0::real) / COALESCE(rc.total_consumption, 0::real) * COALESCE(rc.total_anual_consumption, 0::real) + 
+          COALESCE(rc.power_p1, 0::real) * COALESCE(rc.price_pp1, 0::real) * 365::double precision +
+          COALESCE(rc.power_p2, 0::real) * COALESCE(rc.price_pp2, 0::real) * 365::double precision +
+          COALESCE(rc.power_p3, 0::real) * COALESCE(rc.price_pp3, 0::real) * 365::double precision + 
+          COALESCE(rc.power_p4, 0::real) * COALESCE(rc.price_pp4, 0::real) * 365::double precision +
+          COALESCE(rc.power_p5, 0::real) * COALESCE(rc.price_pp5, 0::real) * 365::double precision + 
+          COALESCE(rc.power_p6, 0::real) * COALESCE(rc.price_pp6, 0::real) * 365::double precision
+        ) * 1.05113::double precision * (1::double precision + COALESCE(rc."VAT", 0::real))
+    ) 
+    / 
+    NULLIF(
+            (
+              COALESCE(rc.anual_consumption_p1, 0::real) * COALESCE(rc."precio_kwh_P1", 0::real) +
+              COALESCE(rc.anual_consumption_p2, 0::real) * COALESCE(rc."precio_kwh_P2", 0::real) +
+              COALESCE(rc.anual_consumption_p3, 0::real) * COALESCE(rc."precio_kwh_P3", 0::real) +
+              COALESCE(rc.anual_consumption_p4, 0::real) * COALESCE(rc."precio_kwh_P4", 0::real) +
+              COALESCE(rc.anual_consumption_p5, 0::real) * COALESCE(rc."precio_kwh_P5", 0::real) +
+              COALESCE(rc.anual_consumption_p6, 0::real) * COALESCE(rc."precio_kwh_P6", 0::real) +
+              COALESCE(NULLIF(rc.power_p1, 0::double precision), 1::real) * COALESCE(rc."precio_kw_P1", 0::real) * 365::double precision +
+              COALESCE(rc.power_p2, 0::real) * COALESCE(rc."precio_kw_P2", 0::real) * 365::double precision +
+              COALESCE(rc.power_p3, 0::real) * COALESCE(rc."precio_kw_P3", 0::real) * 365::double precision +
+              COALESCE(rc.power_p4, 0::real) * COALESCE(rc."precio_kw_P4", 0::real) * 365::double precision +
+              COALESCE(rc.power_p5, 0::real) * COALESCE(rc."precio_kw_P5", 0::real) * 365::double precision + 
+              COALESCE(rc.power_p6, 0::real) * COALESCE(rc."precio_kw_P6", 0::real) * 365::double precision - 
+              COALESCE(rc.surpluses, 0::real) * 182.5::double precision 
+              / 
+              case
+                when COALESCE(rc.days::real, 0::real) = 1::double precision then 182.5
+                else rc.days::numeric
+              end::double precision
+               * COALESCE(rc.autoconsumo_precio, 0::real)
+            ) * case
+              when rc.type = any (array['light'::text, '3_0'::text]) then 1.05113::double precision
+                else 1.0::double precision
+              end * (1::double precision + COALESCE(rc."VAT", 0::real)),
+            0::double precision
+          )
+    else 0.0::double precision
+  end as saving_percentage,
+
 
   -- (10) Info personas / filtros auxiliares
   us.supervisors,
