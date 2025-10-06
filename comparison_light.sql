@@ -1,4 +1,4 @@
--- DROP VIEW IF EXISTS public._comparisons_detailed_light;
+ --DROP VIEW IF EXISTS public._comparisons_detailed_light;
 
 CREATE OR REPLACE VIEW public._comparisons_detailed_light_test AS
 WITH
@@ -48,7 +48,7 @@ base AS (
 
     cl.max_power,
 
-    -- Precios actuales (para coste “actual”)
+    -- Precios actuales (para coste "actual")
     cl."precio_kwh_P1",
     cl."precio_kwh_P2",
     cl."precio_kwh_P3",
@@ -73,7 +73,14 @@ base AS (
 
     cr.price_pp1, cr.price_pp2, cr.price_pp3, cr.price_pp4, cr.price_pp5, cr.price_pp6,
     cr.price_cp1, cr.price_cp2, cr.price_cp3, cr.price_cp4, cr.price_cp5, cr.price_cp6,
-    cr.price_surpluses
+    cr.price_surpluses,
+
+    -- Columnas de mantenimiento
+    cr.has_maintenance,
+    cr.daily_maintenance_with_vat,
+    cr.has_permanence,
+    cr.rate_mode
+
   FROM comparison_light cl
   LEFT JOIN comparison_rates cr
     ON cr.type = 'light'
@@ -100,7 +107,14 @@ m_calc AS (
   SELECT
     b.*,
 
-    -- Totales “nuevo” (energia + potencia) por mes, pre-IVA (para trazabilidad)
+    -- Cálculo de mantenimiento mensual
+    CASE 
+      WHEN b.has_maintenance = true THEN 
+        b.daily_maintenance_with_vat * COALESCE(b.power_days, 0)::double precision
+      ELSE 0 
+    END AS maintenance_total,
+
+    -- Totales "nuevo" (energia + potencia) por mes, pre-IVA (para trazabilidad)
     (COALESCE(b.consumption_p1,0::real)*COALESCE(b.price_cp1,0::real) +
      COALESCE(b.consumption_p2,0::real)*COALESCE(b.price_cp2,0::real) +
      COALESCE(b.consumption_p3,0::real)*COALESCE(b.price_cp3,0::real))                 AS m_consumo,
@@ -116,7 +130,18 @@ m_calc AS (
     (COALESCE(b.power_p1,0::real)*COALESCE(b.price_pp1,0::real)*COALESCE(b.power_days,0::double precision) +
      COALESCE(b.power_p2,0::real)*COALESCE(b.price_pp2,0::real)*COALESCE(b.power_days,0::double precision)) AS total_power_price,
 
-    COALESCE(b.surpluses,0)*COALESCE(b.price_surpluses,0)                   AS total_surpluses_price
+    COALESCE(b.surpluses,0)*COALESCE(b.price_surpluses,0)                   AS total_surpluses_price,
+
+    -- Precio mensual NUEVO (pre-IVA, sin IEE)
+    (
+      COALESCE(b.power_p1, 0::real) * COALESCE(b.price_pp1, 0::real) * COALESCE(b.power_days, 0)::double precision +
+      COALESCE(b.power_p2, 0::real) * COALESCE(b.price_pp2, 0::real) * COALESCE(b.power_days, 0)::double precision +
+      COALESCE(b.consumption_p1, 0::real) * COALESCE(b.price_cp1, 0::real) +
+      COALESCE(b.consumption_p2, 0::real) * COALESCE(b.price_cp2, 0::real) +
+      COALESCE(b.consumption_p3, 0::real) * COALESCE(b.price_cp3, 0::real) -
+      COALESCE(b.surpluses, 0::real) * COALESCE(b.price_surpluses, 0::real)
+    ) AS new_total_price
+
   FROM base b
 ),
 
@@ -125,27 +150,35 @@ tot AS (
   SELECT
     m.*,
 
-    -- Precio mensual NUEVO (pre-IVA, sin IEE): exactamente como antes
-    (
-      COALESCE(m.power_p1, 0::real) * COALESCE(m.price_pp1, 0::real) * COALESCE(m.power_days, 0)::double precision +
-      COALESCE(m.power_p2, 0::real) * COALESCE(m.price_pp2, 0::real) * COALESCE(m.power_days, 0)::double precision +
-      COALESCE(m.consumption_p1, 0::real) * COALESCE(m.price_cp1, 0::real) +
-      COALESCE(m.consumption_p2, 0::real) * COALESCE(m.price_cp2, 0::real) +
-      COALESCE(m.consumption_p3, 0::real) * COALESCE(m.price_cp3, 0::real) -
-      COALESCE(m.surpluses, 0::real) * COALESCE(m.price_surpluses, 0::real)
-    ) AS new_total_price,
-
     -- IEE mensual (para columna iee_monthly)
     (m.m_consumo + m.m_potencia) * 0.05113::double precision                                     AS iee_monthly,
 
-    -- Precio anual NUEVO con IEE + VAT
+    -- Calcular base sin mantenimiento primero
+    CASE
+      WHEN m.tarifa_plana = TRUE THEN
+        (
+          (COALESCE(m.new_total_price, 0::double precision) * 1.05113::double precision)
+          + COALESCE(m.equipment_rental, 0::real)
+        ) * (1::double precision + COALESCE(m."VAT", 0::real))
+      ELSE
+        (
+          (
+            COALESCE(m.new_total_price, 0::double precision)
+            + (COALESCE(m.power_days, 0)::numeric * 0.012742)::double precision
+          ) * 1.05113::double precision
+          + COALESCE(m.equipment_rental, 0::real)
+        ) * (1::double precision + COALESCE(m."VAT", 0::real))
+    END::numeric::double precision AS new_total_price_with_vat_base,
+
+    -- Precio anual NUEVO con IEE + VAT + mantenimiento anual
     (
       COALESCE(m.anual_consumption_p1,0::real)*COALESCE(m.price_cp1,0::real) +
       COALESCE(m.anual_consumption_p2,0::real)*COALESCE(m.price_cp2,0::real) +
       COALESCE(m.anual_consumption_p3,0::real)*COALESCE(m.price_cp3,0::real) +
       COALESCE(NULLIF(m.power_p1,0::double precision),1::real)*COALESCE(m.price_pp1,0::real)*365::double precision +
       COALESCE(m.power_p2,0::real)*COALESCE(m.price_pp2,0::real)*365::double precision
-    ) * (1 + 0.05113::double precision) * (1 + COALESCE(m."VAT",0::real))                        AS new_total_yearly_price_with_vat,
+    ) * (1 + 0.05113::double precision) * (1 + COALESCE(m."VAT",0::real)) 
+    + (COALESCE(m.daily_maintenance_with_vat, 0) * 365) AS new_total_yearly_price_with_vat,
 
     -- Precio anual ACTUAL con IEE + VAT (para savings_yearly)
     (
@@ -172,20 +205,18 @@ with_crs AS (
     COALESCE(t.power_p2,0::real)*COALESCE(crs.crs_pp2,0::real) +
     COALESCE(crs.fixed_crs,0::real)                                                         AS total_crs,
 
-    -- Ahorro mensual (actual mensual - nuevo mensual)
+    -- Ahorro mensual (actual mensual - nuevo mensual con mantenimiento)
     CASE
       WHEN t.new_company IS NOT NULL THEN
         COALESCE(t.current_total_invoice, 0::real)::double precision
         -
         (
-          (COALESCE(t.new_total_price, 0::double precision) * 1.05113::double precision
-            + COALESCE(t.equipment_rental, 0::real))
-          * (1::double precision + COALESCE(t."VAT", 0::real))
+          t.new_total_price_with_vat_base + COALESCE(t.maintenance_total, 0)
         )
       ELSE 0.0::double precision
     END                                                                                AS savings,
 
-    -- Ahorro anual
+    -- Ahorro anual (actual anual - nuevo anual con mantenimiento)
     CASE
       WHEN t.tarifa_plana = TRUE THEN
         t.current_total_invoice * (365.0 / NULLIF(t.power_days::numeric,0))::double precision
@@ -387,23 +418,8 @@ SELECT DISTINCT
     ) * 0.05113::double precision
   ) AS iee,
 
-  -- Precio nuevo mensual con IVA (solo aquí, según reglas de light)
-  CASE
-    WHEN rc.tarifa_plana = TRUE THEN
-      (
-        (COALESCE(rc.new_total_price, 0::double precision) * 1.05113::double precision)
-        + COALESCE(rc.equipment_rental, 0::real)
-      ) * (1::double precision + COALESCE(rc."VAT", 0::real))
-    ELSE
-      (
-        (
-          COALESCE(rc.new_total_price, 0::double precision)
-          + (COALESCE(rc.power_days, 0)::numeric * 0.012742)::double precision
-        ) * 1.05113::double precision
-        + COALESCE(rc.equipment_rental, 0::real)
-      ) * (1::double precision + COALESCE(rc."VAT", 0::real))
-    END::numeric::double precision AS new_total_price_with_vat,
-
+  -- Precio nuevo mensual con IVA + mantenimiento
+  rc.new_total_price_with_vat_base + COALESCE(rc.maintenance_total, 0) AS new_total_price_with_vat,
 
   rc.new_total_yearly_price_with_vat,
 
@@ -440,7 +456,11 @@ SELECT DISTINCT
   ) AS search,
   ARRAY[COALESCE(rc.company,''::text),'All'] AS company_filter,
   rc.cif,
-  rc.region
+  rc.region,
+  rc.daily_maintenance_with_vat::numeric(8,2),
+  rc.has_permanence,
+  rc.rate_mode
+
 FROM with_advisor rc
 LEFT JOIN users u ON u.user_id = rc.advisor_id
 WHERE rc.rank = 1

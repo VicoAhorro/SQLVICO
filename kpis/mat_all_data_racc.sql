@@ -1,0 +1,37 @@
+create materialized view public.mat_all_data_racc as
+select
+  mat_all_data.source,
+  mat_all_data.id,
+  mat_all_data.created_at,
+  mat_all_data.activation_date,
+  mat_all_data.client_email,
+  mat_all_data.advisor_id,
+  mat_all_data.advisor_email,
+  mat_all_data.name,
+  mat_all_data.last_name,
+  mat_all_data."DNI",
+  mat_all_data.address,
+  mat_all_data.phone,
+  mat_all_data.client_type,
+  mat_all_data.contract_type,
+  mat_all_data.new_company,
+  mat_all_data.new_rate_name,
+  mat_all_data.new_subrate,
+  mat_all_data.saving_percentage,
+  mat_all_data.pdf_invoice,
+  mat_all_data.total_savings,
+  mat_all_data."CUPS",
+  mat_all_data.status,
+  mat_all_data.last_update,
+  mat_all_data.fecha_baja,
+  mat_all_data.baja_firma_delegada,
+  mat_all_data.firma_date,
+  mat_all_data.valuation_id,
+  mat_all_data.valuation_created_at,
+  mat_all_data.pdf_proposal,
+  mat_all_data.comparison_id,
+  mat_all_data.comparison_created_at
+from
+  mat_all_data
+where
+  mat_all_data.tenant = 1;
