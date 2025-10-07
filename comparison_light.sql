@@ -164,7 +164,7 @@ tot AS (
         (
           (
             COALESCE(m.new_total_price, 0::double precision)
-            + (COALESCE(m.power_days, 0)::numeric * 0.012742)::double precision
+            + (COALESCE(m.power_days, 0)::numeric)::double precision
           ) * 1.05113::double precision
           + COALESCE(m.equipment_rental, 0::real)
         ) * (1::double precision + COALESCE(m."VAT", 0::real))

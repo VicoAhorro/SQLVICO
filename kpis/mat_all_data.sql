@@ -2,6 +2,7 @@ DROP MATERIALIZED VIEW IF EXISTS public.mat_all_data;
 
 CREATE MATERIALIZED VIEW public.mat_all_data AS
 WITH latest_val AS (
+  -- Última valoración por (email, asesor) - se usa en el bloque CLIENTS
   SELECT DISTINCT ON (client_email, advisor_id)
          client_email,
          advisor_id,
@@ -10,6 +11,17 @@ WITH latest_val AS (
          pdf_proposal
   FROM public._valuations_detailed
   ORDER BY client_email, advisor_id, created_at DESC
+),
+latest_val_by_contract AS (
+  -- Última valoración por contrato - se usa en el bloque CONTRACTS
+  SELECT DISTINCT ON (contract_id)
+         contract_id,
+         id         AS valuation_id,
+         created_at AS valuation_created_at,
+         pdf_proposal
+  FROM public._valuations_detailed
+  WHERE contract_id IS NOT NULL
+  ORDER BY contract_id, created_at DESC
 ),
 latest_cmp AS (
   -- Última comparación por valoración (vista unificada)
@@ -51,47 +63,49 @@ SELECT
   c.fecha_baja,                      -- 25
   c.baja_firma_delegada,             -- 26
   c.firma_date,                      -- 27
-  NULL::uuid              AS valuation_id,         -- 28
-  NULL::timestamp         AS valuation_created_at, -- 29
-  NULL::text              AS pdf_proposal,         -- 30
-  NULL::uuid              AS comparison_id,        -- 31
-  NULL::timestamp         AS comparison_created_at -- 32
+  lvc.valuation_id          AS valuation_id,          -- 28 (desde última valoración del contrato)
+  lvc.valuation_created_at  AS valuation_created_at,  -- 29
+  lvc.pdf_proposal          AS pdf_proposal,          -- 30
+  lcc.comparison_id         AS comparison_id,         -- 31 (última comparación de esa valoración)
+  lcc.comparison_created_at AS comparison_created_at  -- 32
 FROM public._contracts_detailed c
 JOIN public.users u ON u.user_id = c.advisor_id
+LEFT JOIN latest_val_by_contract lvc ON lvc.contract_id = c.id
+LEFT JOIN latest_cmp            lcc ON lcc.valuation_id = lvc.valuation_id
 
 UNION ALL
 -- ============================== COMPARISONS ==============================
 SELECT
-  c.tenant,                          --  1 tenant (desde _comparisons)
+  c.tenant,                          --  1 tenant
   'comparison'::text AS source,      --  2
-  c.id,                              --  3 id (de public._comparisons)
-  c.created_at,                      --  4 created_at (comparativa)
+  c.id,                              --  3
+  c.created_at,                      --  4
   NULL::timestamp   AS activation_date, -- 5
   c.client_email,                    --  6
   c.advisor_id,                      --  7
-  u.email AS advisor_email,          --  8 (email del asesor)
+  u.email AS advisor_email,          --  8
   c.client_name       AS name,       --  9
   c.client_last_name  AS last_name,  -- 10
   c."DNI",                           -- 11
   NULL::text          AS address,    -- 12
   c.phone             AS phone,      -- 13
   NULL::text          AS client_type,-- 14
-  c.contract_type,                   -- 15  <-- desde _comparisons
-  c.new_company,                     -- 16  <-- desde _comparisons
-  c.new_rate_name,                   -- 17  <-- desde _comparisons
-  c.new_subrate,                     -- 18  <-- desde _comparisons
-  c.saving_percentage,               -- 19  <-- desde _comparisons
-  c.pdf_invoice,                     -- 20  (comparativa)
+  c.contract_type,                   -- 15
+  c.new_company,                     -- 16
+  c.new_rate_name,                   -- 17
+  c.new_subrate,                     -- 18
+  c.saving_percentage,               -- 19
+  c.pdf_invoice,                     -- 20
   NULL::double precision AS total_savings, -- 21
-  c."CUPS",                          -- 22  <-- desde _comparisons
+  c."CUPS",                          -- 22
   NULL::text         AS status,          -- 23
   NULL::timestamp    AS last_update,     -- 24
   NULL::timestamp    AS fecha_baja,      -- 25
   NULL::timestamp    AS baja_firma_delegada, -- 26
   NULL::timestamp    AS firma_date,      -- 27
   c.valuation_id      AS valuation_id,       -- 28
-  v.created_at        AS valuation_created_at, -- 29 (sólo fecha de la valoración)
-  v.pdf_proposal      AS pdf_proposal,        -- 30 (desde la valoración)
+  v.created_at        AS valuation_created_at, -- 29
+  v.pdf_proposal      AS pdf_proposal,        -- 30
   c.id                AS comparison_id,       -- 31
   c.created_at        AS comparison_created_at -- 32
 FROM public._comparisons c
@@ -99,7 +113,7 @@ LEFT JOIN public._valuations_detailed v ON v.id = c.valuation_id
 LEFT JOIN public.users u ON u.user_id = c.advisor_id
 
 UNION ALL
--- =============================== VALUATIONS ==============================
+-- =============================== VALUATIONS ===============================
 SELECT
   u.tenant,                          --  1
   'valuation'::text AS source,       --  2
@@ -122,7 +136,7 @@ SELECT
   v.saving_percentage,               -- 19
   v.pdf_invoice,                     -- 20
   NULL::double precision AS total_savings, -- 21
-  v."CUPS",                              -- 22
+  v."CUPS",                          -- 22
   NULL::text         AS status,          -- 23
   NULL::timestamp    AS last_update,     -- 24
   NULL::timestamp    AS fecha_baja,      -- 25

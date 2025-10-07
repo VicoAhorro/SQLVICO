@@ -1110,7 +1110,7 @@ with recursive
 -- ================================================================================
       case
         when ucp.tarifa_plana = true and ucp.type = 'light' then 
-        COALESCE(ucp.current_total_invoice, 0::real) * (365.0 / ucp.days::numeric)::double precision
+        COALESCE(ucp.current_total_invoice, 0::real) * (365.0 / NULLIF(ucp.days::numeric, 0))::double precision
          -
           (
             COALESCE(ucp.anual_consumption_p1, 0::real) * COALESCE(ucp.price_cp1, 0::real) + 
@@ -1124,7 +1124,7 @@ with recursive
             1::double precision + COALESCE(ucp."VAT", 0::real)
           )
         when ucp.tarifa_plana = true and ucp.type = 'gas' then 
-        COALESCE(ucp.current_total_invoice, 0::real) * (365.0 / ucp.days::numeric)::double precision
+        COALESCE(ucp.current_total_invoice, 0::real) * (365.0 / NULLIF(ucp.days::numeric, 0))::double precision
          -
           (
             COALESCE(ucp.anual_consumption_p1, 0::real) * (COALESCE(ucp.price_cp1, 0::real)+0.00234) + 
@@ -1750,7 +1750,7 @@ select distinct
     when rc.type = 'light'::text then 
     (
       (
-        COALESCE(rc.new_total_price, 0::real::double precision) + (COALESCE(rc.days)::numeric * 0.012742)::double precision
+        COALESCE(rc.new_total_price, 0::real::double precision) + (COALESCE(rc.days)::numeric)::double precision
       ) * 1.05113::double precision + COALESCE(rc.equipment_rental)
     ) * (1::double precision + COALESCE(rc."VAT", 0::real))
 
@@ -1815,7 +1815,7 @@ select distinct
     )
     WHEN rc.tarifa_plana = TRUE and rc.type = 'light' THEN
      (
-      (rc.current_total_invoice * (365.0 / rc.days)) -
+      (rc.current_total_invoice * (365.0 / NULLIF(rc.days::numeric, 0))) -
       ( (
             (COALESCE(rc.anual_consumption_p1, 0) * COALESCE(rc.price_cp1, 0)) +
             (COALESCE(rc.anual_consumption_p2, 0) * COALESCE(rc.price_cp2, 0)) +
@@ -1824,15 +1824,16 @@ select distinct
             (COALESCE(rc.power_p2, 0) * COALESCE(rc.price_pp2, 0) * 365)
           ) * 1.05113) 
       * (1 + COALESCE(rc."VAT", 0.0))
-    ) / (rc.current_total_invoice * (365.0 / rc.days))
+    ) / (rc.current_total_invoice * (365.0 / NULLIF(rc.days::numeric, 0)))
 
     WHEN rc.tarifa_plana = TRUE and rc.type = 'gas' THEN
      (
-      (rc.current_total_invoice * (365.0 / rc.days)) -
+      (rc.current_total_invoice * (365.0 / NULLIF(rc.days::numeric, 0))) -
       ( (
-            (COALESCE(rc.anual_consumption_p1, 0) * (COALESCE(rc.price_cp1, 0))+0.00234) +
-            (COALESCE(rc.price_pp1, 0) * 365)) * (1 + COALESCE(rc."VAT", 0.0))
-    )) / (rc.current_total_invoice * (365.0 / rc.days))
+            (COALESCE(rc.anual_consumption_p1, 0) * (COALESCE(rc.price_cp1, 0))+0.00234) + (COALESCE(rc.price_pp1, 0) * 365)
+        ) * (1 + COALESCE(rc."VAT", 0.0))
+      )
+    ) / NULLIF(rc.current_total_invoice * (365.0 / NULLIF(rc.days::numeric, 0)), 0.0::double precision)
     when rc.new_company is not null and rc.type <> '3_0'::text then 
     (
       (
