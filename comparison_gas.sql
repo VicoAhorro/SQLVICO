@@ -72,6 +72,7 @@ calculated_prices_gas AS (
     cg.invoice_year,
     cg.meter_rental,
     cg.preferred_subrate,
+    cg.wants_permanence,
 
     -- Nueva tarifa (cr)
     cr.company                                   AS new_company,
@@ -135,6 +136,10 @@ calculated_prices_gas AS (
         OR cg.preferred_subrate = ''
         OR cr.subrate_name = cg.rate_name
    )
+   AND (
+        (CL.wants_permanence = TRUE AND cr.has_permanence = TRUE)
+        OR (cl.wants_permanence = FALSE)
+   )   
   WHERE (cg.deleted IS NULL OR cg.deleted = FALSE)
     AND (cg.region IS NULL OR cg.region = ANY (cr.region))
 ),
