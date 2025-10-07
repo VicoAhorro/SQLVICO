@@ -40,6 +40,7 @@ base AS (
     cl.deleted,
     cl.deleted_reason,
     cl.preferred_subrate,
+    cl.wants_permanence,
 
     -- Anuales (light: P1..P3)
     cl.anual_consumption_p1,
@@ -99,6 +100,10 @@ base AS (
         OR (cl.selfconsumption = FALSE)
    )
    AND (cl.region IS NULL OR cl.region = ANY (cr.region))
+   AND (
+        (CL.wants_permanence = TRUE AND cr.has_permanence = TRUE)
+        OR (cl.wants_permanence = FALSE)
+   )
   WHERE cl.deleted IS DISTINCT FROM TRUE
 ),
 

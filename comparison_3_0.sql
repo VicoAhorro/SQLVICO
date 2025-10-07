@@ -67,6 +67,7 @@ calculated_prices_3_0 AS (
     c30.invoice_year,
     0::real AS meter_rental,
     c30.preferred_subrate,
+    c30.wants_permanence,
 
     cr.company      AS new_company,
     cr.rate_name    AS new_rate_name,
@@ -156,6 +157,10 @@ calculated_prices_3_0 AS (
         OR cr.subrate_name = c30.preferred_subrate
    )
   AND (c30.rate_i_want IS NULL OR cr.rate_mode = c30.rate_i_want)
+   AND (
+        (CL.wants_permanence = TRUE AND cr.has_permanence = TRUE)
+        OR (cl.wants_permanence = FALSE)
+   )
   WHERE (c30.deleted IS NULL OR c30.deleted = FALSE)
     AND (c30.region IS NULL OR c30.region = ANY (cr.region))
 ),

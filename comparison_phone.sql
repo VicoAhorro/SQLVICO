@@ -83,6 +83,7 @@ ranked_phone AS (
     0 AS invoice_year,
     0 AS meter_rental,
     ''::text AS preferred_subrate,
+    false AS wants_permanence,
 
     -- Nueva “tarifa” (pack)
     rc_1.rate_company AS new_company,
