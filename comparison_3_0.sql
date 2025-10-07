@@ -158,8 +158,8 @@ calculated_prices_3_0 AS (
    )
   AND (c30.rate_i_want IS NULL OR cr.rate_mode = c30.rate_i_want)
    AND (
-        (CL.wants_permanence = TRUE AND cr.has_permanence = TRUE)
-        OR (cl.wants_permanence = FALSE)
+        (c30.wants_permanence = TRUE AND cr.has_permanence = TRUE)
+        OR (c30.wants_permanence = FALSE)
    )
   WHERE (c30.deleted IS NULL OR c30.deleted = FALSE)
     AND (c30.region IS NULL OR c30.region = ANY (cr.region))

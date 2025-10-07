@@ -101,7 +101,7 @@ base AS (
    )
    AND (cl.region IS NULL OR cl.region = ANY (cr.region))
    AND (
-        (CL.wants_permanence = TRUE AND cr.has_permanence = TRUE)
+        (cl.wants_permanence = TRUE AND cr.has_permanence = TRUE)
         OR (cl.wants_permanence = FALSE)
    )
   WHERE cl.deleted IS DISTINCT FROM TRUE

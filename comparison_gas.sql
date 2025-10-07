@@ -137,8 +137,8 @@ calculated_prices_gas AS (
         OR cr.subrate_name = cg.rate_name
    )
    AND (
-        (CL.wants_permanence = TRUE AND cr.has_permanence = TRUE)
-        OR (cl.wants_permanence = FALSE)
+        (cg.wants_permanence = TRUE AND cr.has_permanence = TRUE)
+        OR (cg.wants_permanence = FALSE)
    )   
   WHERE (cg.deleted IS NULL OR cg.deleted = FALSE)
     AND (cg.region IS NULL OR cg.region = ANY (cr.region))
