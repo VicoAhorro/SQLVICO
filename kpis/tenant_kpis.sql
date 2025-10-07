@@ -20,9 +20,11 @@ returns table (
   comps_totales bigint,
   comps_to_valuations bigint
 )
-language sql stable
+language sql
+stable
 security definer
 set search_path = public
+set statement_timeout = '50s'  -- ✅ esta línea es válida y se aplicará en llamadas RPC
 as $$
 with args as (
   select
@@ -87,7 +89,7 @@ comparativas as (
     count(*) filter (where v.created_at >= a.dfrom and v.created_at < a.dto) as comps_totales,
     count(*) filter (where v.valuation_id is not null
                      and v.created_at >= a.dfrom and v.created_at < a.dto) as comps_to_valuations
-  from _comparisons_detailed4 v
+  from mat_comparisons_historic v
   left join users u on u.user_id = v.advisor_id
   join args a on true
   group by u.tenant

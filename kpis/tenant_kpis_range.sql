@@ -1,6 +1,6 @@
 create or replace function public.tenant_kpis_range(
   p_tenant_id int,
-  p_entity_id uuid default null,
+  p_entity_id text default null,           -- ✅ cambiado a text
   p_role_id   text default null,
   p_supervisor_id text default null,
   p_from      text default null,
@@ -28,15 +28,20 @@ returns table (
   comps_totales int,
   comps_to_valuations int
 )
-language sql stable
+language sql
+stable
 security definer
 set search_path = public
+set statement_timeout = '20s'   -- ✅ válido en Supabase RPC
 as $$
 with args as (
   select
     p_tenant_id as tenant_id,
-    coalesce(to_timestamp(nullif(p_from,'null'), 'DD/MM/YYYY'),'-infinity'::timestamp) as dfrom,
-    coalesce(  to_timestamp(nullif(p_to,'null'), 'DD/MM/YYYY') + interval '1 day',  now()) as dto
+    coalesce(to_timestamp(nullif(p_from,'null'), 'DD/MM/YYYY'), '-infinity'::timestamp) as dfrom,
+    coalesce(to_timestamp(nullif(p_to,'null'),   'DD/MM/YYYY') + interval '1 day', now()) as dto,
+    nullif(p_entity_id,'null')::uuid        as entity_uuid,       -- ✅ convertido internamente
+    nullif(p_role_id,'null')::uuid          as role_uuid,
+    nullif(p_supervisor_id,'null')::uuid    as supervisor_uuid
 ),
 base_entities as (
   select 
@@ -46,12 +51,13 @@ base_entities as (
     u.supervisor_id,
     u.name as entity_name,
     u.email as entity_email
-  from public.users u, args a
+  from public.users u
+  join args a on true
   where u.deleted = false
     and u.tenant = a.tenant_id
-    and (p_entity_id is null or u.user_id = p_entity_id)
-    and (p_role_id is null or u.role_id = p_role_id)
-    and (p_supervisor_id is null or u.supervisor_id = p_supervisor_id)
+    and (a.entity_uuid is null or u.user_id = a.entity_uuid)   -- ✅ ahora compara bien
+    and (a.role_uuid is null or u.role_id = a.role_uuid)
+    and (a.supervisor_uuid is null or u.supervisor_id = a.supervisor_uuid)
 ),
 cli as (
   select u.user_id as entity_id, count(*) as clientes_totales
@@ -109,8 +115,8 @@ cmp as (
     count(*) filter (where v.created_at >= a.dfrom and v.created_at < a.dto) as comps_totales,
     count(*) filter (where v.valuation_id is not null 
                      and v.created_at >= a.dfrom and v.created_at < a.dto) as comps_to_valuations
-  from public._comparisons_detailed4 v
-  left join public.users u on u.user_id = v.advisor_id
+  from public.mat_comparisons_historic v
+  join public.users u on u.user_id = v.advisor_id and u.deleted = false
   join args a on true
   join base_entities be on be.entity_id = u.user_id
   group by u.user_id
@@ -142,5 +148,4 @@ left join val on val.entity_id = be.entity_id
 left join ctr on ctr.entity_id = be.entity_id
 left join cmp on cmp.entity_id = be.entity_id
 order by be.entity_name nulls last, be.entity_id;
-$$
-set statement_timeout TO '20s';
+$$;
