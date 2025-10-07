@@ -1750,7 +1750,7 @@ select distinct
     when rc.type = 'light'::text then 
     (
       (
-        COALESCE(rc.new_total_price, 0::real::double precision) + (COALESCE(rc.days)::numeric)::double precision
+        COALESCE(rc.new_total_price, 0::real::double precision)::double precision
       ) * 1.05113::double precision + COALESCE(rc.equipment_rental)
     ) * (1::double precision + COALESCE(rc."VAT", 0::real))
 
