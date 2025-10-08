@@ -1,4 +1,4 @@
-DROP VIEW IF EXISTS public._comparisons_detailed_gas;
+--DROP VIEW IF EXISTS public._comparisons_detailed_gas;
 
 CREATE OR REPLACE VIEW public._comparisons_detailed_gas AS
 WITH
@@ -138,7 +138,7 @@ calculated_prices_gas AS (
    )
    AND (
         (cg.wants_permanence = TRUE AND cr.has_permanence = TRUE)
-        OR (cg.wants_permanence = FALSE)
+        OR (cg.wants_permanence IS NOT TRUE)
    )   
   WHERE (cg.deleted IS NULL OR cg.deleted = FALSE)
     AND (cg.region IS NULL OR cg.region = ANY (cr.region))
