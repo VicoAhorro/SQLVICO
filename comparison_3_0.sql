@@ -67,6 +67,7 @@ calculated_prices_3_0 AS (
     c30.invoice_year,
     0::real AS meter_rental,
     c30.preferred_subrate,
+    c30.wants_permanence,
 
     cr.company      AS new_company,
     cr.rate_name    AS new_rate_name,
@@ -201,49 +202,11 @@ calculated_prices_3_0 AS (
         OR c30.preferred_subrate = ''
         OR cr.subrate_name = c30.preferred_subrate
    )
-
-  -- NUEVO: indexada nuestra para calcular fee_diff (misma compañía y mes/año)
-  LEFT JOIN comparison_rates cr_idx
-    ON cr_idx.type = '3_0'
-   AND cr_idx.company = cr.company
-   AND cr_idx.rate_mode = 'indexada'
+  AND (c30.rate_i_want IS NULL OR cr.rate_mode = c30.rate_i_want)
    AND (
-        (cr_idx.invoice_month IS NULL AND cr_idx.invoice_year IS NULL)
-        OR (cr_idx.invoice_month = c30.invoice_month AND cr_idx.invoice_year = c30.invoice_year)
+        (c30.wants_permanence = TRUE AND cr.has_permanence = TRUE)
+        OR (c30.wants_permanence = FALSE)
    )
-
-  -- NUEVO: fee_diff (media de diferencias positivas)
-  LEFT JOIN LATERAL (
-    SELECT COALESCE(AVG(x),0) AS fee_diff
-    FROM (
-      VALUES
-        (CASE WHEN c30."precio_kwh_P1" IS NOT NULL AND cr_idx.price_cp1 IS NOT NULL
-              THEN GREATEST(c30."precio_kwh_P1" - cr_idx.price_cp1, 0)::numeric END),
-        (CASE WHEN c30."precio_kwh_P2" IS NOT NULL AND cr_idx.price_cp2 IS NOT NULL
-              THEN GREATEST(c30."precio_kwh_P2" - cr_idx.price_cp2, 0)::numeric END),
-        (CASE WHEN c30."precio_kwh_P3" IS NOT NULL AND cr_idx.price_cp3 IS NOT NULL
-              THEN GREATEST(c30."precio_kwh_P3" - cr_idx.price_cp3, 0)::numeric END),
-        (CASE WHEN c30."precio_kwh_P4" IS NOT NULL AND cr_idx.price_cp4 IS NOT NULL
-              THEN GREATEST(c30."precio_kwh_P4" - cr_idx.price_cp4, 0)::numeric END),
-        (CASE WHEN c30."precio_kwh_P5" IS NOT NULL AND cr_idx.price_cp5 IS NOT NULL
-              THEN GREATEST(c30."precio_kwh_P5" - cr_idx.price_cp5, 0)::numeric END),
-        (CASE WHEN c30."precio_kwh_P6" IS NOT NULL AND cr_idx.price_cp6 IS NOT NULL
-              THEN GREATEST(c30."precio_kwh_P6" - cr_idx.price_cp6, 0)::numeric END)
-    ) v(x)
-  ) fee ON TRUE
-
-  -- NUEVO: media indexada anual (tabla externa)
-  LEFT JOIN reference_indexed_annual_prices ria
-    ON ria.rate_type = '3_0'
-   AND ria.ref_year  = COALESCE(c30.invoice_year, EXTRACT(YEAR FROM c30.created_at)::int)
-   AND (ria.region IS NULL OR ria.region = c30.region)
-
-  -- (SI LA NECESITAS) referencia fija
-  LEFT JOIN reference_fixed_energy_prices rfix
-    ON rfix.rate_type = '3_0'
-   AND rfix.ref_year  = COALESCE(c30.invoice_year, EXTRACT(YEAR FROM c30.created_at)::int)
-   AND (rfix.region IS NULL OR rfix.region = c30.region)
-
   WHERE (c30.deleted IS NULL OR c30.deleted = FALSE)
     AND (c30.region IS NULL OR c30.region = ANY (cr.region))
 ),

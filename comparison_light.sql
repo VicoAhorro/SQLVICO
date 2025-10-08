@@ -40,6 +40,7 @@ base AS (
     cl.deleted,
     cl.deleted_reason,
     cl.preferred_subrate,
+    cl.wants_permanence,
 
     -- Anuales (light: P1..P3)
     cl.anual_consumption_p1,
@@ -99,6 +100,10 @@ base AS (
         OR (cl.selfconsumption = FALSE)
    )
    AND (cl.region IS NULL OR cl.region = ANY (cr.region))
+   AND (
+        (cl.wants_permanence = TRUE AND cr.has_permanence = TRUE)
+        OR (cl.wants_permanence = FALSE)
+   )
   WHERE cl.deleted IS DISTINCT FROM TRUE
 ),
 
@@ -162,8 +167,7 @@ tot AS (
         ) * (1::double precision + COALESCE(m."VAT", 0::real))
       ELSE
         (
-          (
-            COALESCE(m.new_total_price, 0::double precision)::double precision
+          (COALESCE(m.new_total_price, 0::double precision))::double precision
           ) * 1.05113::double precision
           + COALESCE(m.equipment_rental, 0::real)
         ) * (1::double precision + COALESCE(m."VAT", 0::real))
