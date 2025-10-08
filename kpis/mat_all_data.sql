@@ -1,3 +1,4 @@
+DROP MATERIALIZED VIEW IF EXISTS public.mat_all_data_racc;
 DROP MATERIALIZED VIEW IF EXISTS public.mat_all_data;
 
 CREATE MATERIALIZED VIEW public.mat_all_data AS
@@ -30,7 +31,7 @@ latest_cmp AS (
          id         AS comparison_id,
          created_at AS comparison_created_at,
          pdf_invoice
-  FROM public._comparisons
+  FROM public.mat_comparisons_historic
   ORDER BY valuation_id, created_at DESC
 )
 
@@ -108,7 +109,7 @@ SELECT
   v.pdf_proposal      AS pdf_proposal,        -- 30
   c.id                AS comparison_id,       -- 31
   c.created_at        AS comparison_created_at -- 32
-FROM public._comparisons c
+FROM public.mat_comparisons_historic c
 LEFT JOIN public._valuations_detailed v ON v.id = c.valuation_id
 LEFT JOIN public.users u ON u.user_id = c.advisor_id
 
