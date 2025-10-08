@@ -1,6 +1,6 @@
 --DROP VIEW IF EXISTS public._comparisons_detailed_3_0;
 
-CREATE OR REPLACE VIEW public._comparisons_detailed_3_0 AS
+CREATE OR REPLACE VIEW public._comparisons_detailed_3_0_test AS
 WITH
 calculated_prices_3_0 AS (
   SELECT
@@ -79,7 +79,6 @@ calculated_prices_3_0 AS (
     cr.has_permanence,
     cr.rate_mode,
 
-    -- Potencia mensual (por días)
     (COALESCE(c30.power_p1,0)*COALESCE(cr.price_pp1,0)*COALESCE(c30.power_days,0))::double precision +
     (COALESCE(c30.power_p2,0)*COALESCE(cr.price_pp2,0)*COALESCE(c30.power_days,0))::double precision +
     (COALESCE(c30.power_p3,0)*COALESCE(cr.price_pp3,0)*COALESCE(c30.power_days,0))::double precision +
@@ -87,7 +86,6 @@ calculated_prices_3_0 AS (
     (COALESCE(c30.power_p5,0)*COALESCE(cr.price_pp5,0)*COALESCE(c30.power_days,0))::double precision +
     (COALESCE(c30.power_p6,0)*COALESCE(cr.price_pp6,0)*COALESCE(c30.power_days,0))::double precision AS total_power_price,
 
-    -- Consumo mensual base con CP del candidato
     COALESCE(c30.consumption_p1,0)*COALESCE(cr.price_cp1,0) +
     COALESCE(c30.consumption_p2,0)*COALESCE(cr.price_cp2,0) +
     COALESCE(c30.consumption_p3,0)*COALESCE(cr.price_cp3,0) +
@@ -95,68 +93,24 @@ calculated_prices_3_0 AS (
     COALESCE(c30.consumption_p5,0)*COALESCE(cr.price_cp5,0) +
     COALESCE(c30.consumption_p6,0)*COALESCE(cr.price_cp6,0) AS total_consumption_price,
 
-    -- NEW: new_total_price definitivo con transición + fee
     (
-      -- término de potencia
-      (
-        COALESCE(c30.power_p1,0)*COALESCE(cr.price_pp1,0)*COALESCE(c30.power_days,0)::double precision +
-        COALESCE(c30.power_p2,0)*COALESCE(cr.price_pp2,0)*COALESCE(c30.power_days,0)::double precision +
-        COALESCE(c30.power_p3,0)*COALESCE(cr.price_pp3,0)*COALESCE(c30.power_days,0)::double precision +
-        COALESCE(c30.power_p4,0)*COALESCE(cr.price_pp4,0)*COALESCE(c30.power_days,0)::double precision +
-        COALESCE(c30.power_p5,0)*COALESCE(cr.price_pp5,0)*COALESCE(c30.power_days,0)::double precision +
-        COALESCE(c30.power_p6,0)*COALESCE(cr.price_pp6,0)*COALESCE(c30.power_days,0)::double precision
-      )
-      +
-      CASE
-        WHEN c30.rate_i_have = 'fija'     AND cr.rate_mode = 'fija' THEN
-          COALESCE(c30.consumption_p1,0)*COALESCE(cr.price_cp1,0) +
-          COALESCE(c30.consumption_p2,0)*COALESCE(cr.price_cp2,0) +
-          COALESCE(c30.consumption_p3,0)*COALESCE(cr.price_cp3,0) +
-          COALESCE(c30.consumption_p4,0)*COALESCE(cr.price_cp4,0) +
-          COALESCE(c30.consumption_p5,0)*COALESCE(cr.price_cp5,0) +
-          COALESCE(c30.consumption_p6,0)*COALESCE(cr.price_cp6,0)
-
-        WHEN c30.rate_i_have = 'indexada' AND cr.rate_mode = 'indexada' THEN
-          COALESCE(c30.consumption_p1,0)*COALESCE(cr.price_cp1,0) +
-          COALESCE(c30.consumption_p2,0)*COALESCE(cr.price_cp2,0) +
-          COALESCE(c30.consumption_p3,0)*COALESCE(cr.price_cp3,0) +
-          COALESCE(c30.consumption_p4,0)*COALESCE(cr.price_cp4,0) +
-          COALESCE(c30.consumption_p5,0)*COALESCE(cr.price_cp5,0) +
-          COALESCE(c30.consumption_p6,0)*COALESCE(cr.price_cp6,0)
-
-        -- Indexada → Fija: media indexada anual (tabla externa) + fee_diff
-        WHEN c30.rate_i_have = 'indexada' AND cr.rate_mode = 'fija' THEN
-          COALESCE(c30.consumption_p1,0) * COALESCE(ria.price_p1 + COALESCE(fee.fee_diff,0), 0) +
-          COALESCE(c30.consumption_p2,0) * COALESCE(ria.price_p2 + COALESCE(fee.fee_diff,0), 0) +
-          COALESCE(c30.consumption_p3,0) * COALESCE(ria.price_p3 + COALESCE(fee.fee_diff,0), 0) +
-          COALESCE(c30.consumption_p4,0) * COALESCE(ria.price_p4 + COALESCE(fee.fee_diff,0), 0) +
-          COALESCE(c30.consumption_p5,0) * COALESCE(ria.price_p5 + COALESCE(fee.fee_diff,0), 0) +
-          COALESCE(c30.consumption_p6,0) * COALESCE(ria.price_p6 + COALESCE(fee.fee_diff,0), 0)
-
-        -- Fija → Indexada: usar manuales
-        WHEN c30.rate_i_have = 'fija'     AND cr.rate_mode = 'indexada' THEN
-          COALESCE(c30.consumption_p1,0) * COALESCE(c30."precio_kwh_P1",0) +
-          COALESCE(c30.consumption_p2,0) * COALESCE(c30."precio_kwh_P2",0) +
-          COALESCE(c30.consumption_p3,0) * COALESCE(c30."precio_kwh_P3",0) +
-          COALESCE(c30.consumption_p4,0) * COALESCE(c30."precio_kwh_P4",0) +
-          COALESCE(c30.consumption_p5,0) * COALESCE(c30."precio_kwh_P5",0) +
-          COALESCE(c30.consumption_p6,0) * COALESCE(c30."precio_kwh_P6",0)
-
-        ELSE
-          COALESCE(c30.consumption_p1,0)*COALESCE(cr.price_cp1,0) +
-          COALESCE(c30.consumption_p2,0)*COALESCE(cr.price_cp2,0) +
-          COALESCE(c30.consumption_p3,0)*COALESCE(cr.price_cp3,0) +
-          COALESCE(c30.consumption_p4,0)*COALESCE(cr.price_cp4,0) +
-          COALESCE(c30.consumption_p5,0)*COALESCE(cr.price_cp5,0) +
-          COALESCE(c30.consumption_p6,0)*COALESCE(cr.price_cp6,0)
-      END
-      +
-      COALESCE(c30.power_surpluses,0)
-      -
-      COALESCE(c30.surpluses,0)*COALESCE(cr.price_surpluses,0)
-    ) AS new_total_price,
-
-    COALESCE(fee.fee_diff,0) AS fee_diff,
+      (COALESCE(c30.power_p1,0)*COALESCE(cr.price_pp1,0)*COALESCE(c30.power_days,0))::double precision +
+      (COALESCE(c30.power_p2,0)*COALESCE(cr.price_pp2,0)*COALESCE(c30.power_days,0))::double precision +
+      (COALESCE(c30.power_p3,0)*COALESCE(cr.price_pp3,0)*COALESCE(c30.power_days,0))::double precision +
+      (COALESCE(c30.power_p4,0)*COALESCE(cr.price_pp4,0)*COALESCE(c30.power_days,0))::double precision +
+      (COALESCE(c30.power_p5,0)*COALESCE(cr.price_pp5,0)*COALESCE(c30.power_days,0))::double precision +
+      (COALESCE(c30.power_p6,0)*COALESCE(cr.price_pp6,0)*COALESCE(c30.power_days,0))::double precision
+    ) +
+    (
+      COALESCE(c30.consumption_p1,0)*COALESCE(cr.price_cp1,0) +
+      COALESCE(c30.consumption_p2,0)*COALESCE(cr.price_cp2,0) +
+      COALESCE(c30.consumption_p3,0)*COALESCE(cr.price_cp3,0) +
+      COALESCE(c30.consumption_p4,0)*COALESCE(cr.price_cp4,0) +
+      COALESCE(c30.consumption_p5,0)*COALESCE(cr.price_cp5,0) +
+      COALESCE(c30.consumption_p6,0)*COALESCE(cr.price_cp6,0)
+    ) +
+    COALESCE(c30.power_surpluses,0) -
+    COALESCE(c30.surpluses,0)*COALESCE(cr.price_surpluses,0) AS new_total_price,
 
     '3_0'::text AS type,
 
@@ -184,17 +138,17 @@ calculated_prices_3_0 AS (
     c30.region,
     c30.rate_i_have,
     c30.rate_i_want
-
+    
   FROM comparison_3_0 c30
-
   LEFT JOIN comparison_rates cr
     ON cr.type = '3_0'
    AND cr.company <> c30.company
-   AND (
-        cr.rate_mode::text <> 'indexada'
+  AND (
+        cr.rate_mode::text <> 'indexada'                                  -- si es Fija, no aplicar filtro de mes/año
         OR (
-          (cr.invoice_month IS NULL AND cr.invoice_year IS NULL)
-          OR (cr.invoice_month = c30.invoice_month AND cr.invoice_year = c30.invoice_year)
+          (cr.invoice_month IS NULL AND cr.invoice_year IS NULL)           -- si es Indexada, aceptar genérica (sin mes/año)
+          OR (cr.invoice_month = c30.invoice_month AND                     -- o específica que coincide con c30
+              cr.invoice_year  = c30.invoice_year)
         )
       )
    AND (
@@ -205,21 +159,33 @@ calculated_prices_3_0 AS (
   AND (c30.rate_i_want IS NULL OR cr.rate_mode = c30.rate_i_want)
    AND (
         (c30.wants_permanence = TRUE AND cr.has_permanence = TRUE)
-        OR (c30.wants_permanence = FALSE)
+        OR (c30.wants_permanence IS NOT TRUE)
    )
   WHERE (c30.deleted IS NULL OR c30.deleted = FALSE)
     AND (c30.region IS NULL OR c30.region = ANY (cr.region))
 ),
-,
-
 unified_calculated_prices AS (
   SELECT * FROM calculated_prices_3_0
 ),
-
+-- EDITADO: fee_diff (media P1..P6) para Indexada -> Fija
+fee_calculated AS (
+  SELECT
+    ucp.id,
+    (
+      (COALESCE(ucp."precio_kwh_P1",0) - COALESCE(ucp.price_cp1,0)) +
+      (COALESCE(ucp."precio_kwh_P2",0) - COALESCE(ucp.price_cp2,0)) +
+      (COALESCE(ucp."precio_kwh_P3",0) - COALESCE(ucp.price_cp3,0)) +
+      (COALESCE(ucp."precio_kwh_P4",0) - COALESCE(ucp.price_cp4,0)) +
+      (COALESCE(ucp."precio_kwh_P5",0) - COALESCE(ucp.price_cp5,0)) +
+      (COALESCE(ucp."precio_kwh_P6",0) - COALESCE(ucp.price_cp6,0))
+    ) / 6.0 AS fee_diff
+  FROM unified_calculated_prices ucp
+),
 unified_extended_prices AS (
   SELECT
     ucp.*,
     crs.id AS crs_id,
+    f.fee_diff,
 
     -- savings (mensual) como estaba
     CASE
@@ -246,50 +212,77 @@ unified_extended_prices AS (
     COALESCE(ucp.power_p6,0)*COALESCE(crs.crs_pp6,0) +
     COALESCE(crs.fixed_crs,0) AS total_crs,
 
-    -- ====== NEW: savings_yearly con transición (energía anual) ======
+    -- savings_yearly como estaba
     CASE
       WHEN ucp.new_company IS NOT NULL THEN
         (
           (
-            -- ENERGÍA ANUAL NUEVA según transición
-            CASE
-              WHEN ucp.rate_i_have = 'indexada' AND ucp.rate_mode = 'fija' THEN
-                COALESCE(ucp.anual_consumption_p1,0) * COALESCE(ria.price_p1 + ucp.fee_diff,0) +
-                COALESCE(ucp.anual_consumption_p2,0) * COALESCE(ria.price_p2 + ucp.fee_diff,0) +
-                COALESCE(ucp.anual_consumption_p3,0) * COALESCE(ria.price_p3 + ucp.fee_diff,0) +
-                COALESCE(ucp.anual_consumption_p4,0) * COALESCE(ria.price_p4 + ucp.fee_diff,0) +
-                COALESCE(ucp.anual_consumption_p5,0) * COALESCE(ria.price_p5 + ucp.fee_diff,0) +
-                COALESCE(ucp.anual_consumption_p6,0) * COALESCE(ria.price_p6 + ucp.fee_diff,0)
-
-              WHEN ucp.rate_i_have = 'fija'     AND ucp.rate_mode = 'indexada' THEN
-                COALESCE(ucp.anual_consumption_p1,0) * COALESCE(ucp."precio_kwh_P1",0) +
-                COALESCE(ucp.anual_consumption_p2,0) * COALESCE(ucp."precio_kwh_P2",0) +
-                COALESCE(ucp.anual_consumption_p3,0) * COALESCE(ucp."precio_kwh_P3",0) +
-                COALESCE(ucp.anual_consumption_p4,0) * COALESCE(ucp."precio_kwh_P4",0) +
-                COALESCE(ucp.anual_consumption_p5,0) * COALESCE(ucp."precio_kwh_P5",0) +
-                COALESCE(ucp.anual_consumption_p6,0) * COALESCE(ucp."precio_kwh_P6",0)
-
-              ELSE
-                -- fija→fija o indexada→indexada: CP del candidato
-                COALESCE(ucp.anual_consumption_p1,0)*COALESCE(ucp.price_cp1,0) +
-                COALESCE(ucp.anual_consumption_p2,0)*COALESCE(ucp.price_cp2,0) +
-                COALESCE(ucp.anual_consumption_p3,0)*COALESCE(ucp.price_cp3,0) +
-                COALESCE(ucp.anual_consumption_p4,0)*COALESCE(ucp.price_cp4,0) +
-                COALESCE(ucp.anual_consumption_p5,0)*COALESCE(ucp.price_cp5,0) +
-                COALESCE(ucp.anual_consumption_p6,0)*COALESCE(ucp.price_cp6,0)
-            END
-            +
-            -- POTENCIA ANUAL (igual que antes)
+            (COALESCE(ucp.anual_consumption_p1,0)*COALESCE(ucp."precio_kwh_P1",0) +
+             COALESCE(ucp.anual_consumption_p2,0)*COALESCE(ucp."precio_kwh_P2",0) +
+             COALESCE(ucp.anual_consumption_p3,0)*COALESCE(ucp."precio_kwh_P3",0) +
+             COALESCE(ucp.anual_consumption_p4,0)*COALESCE(ucp."precio_kwh_P4",0) +
+             COALESCE(ucp.anual_consumption_p5,0)*COALESCE(ucp."precio_kwh_P5",0) +
+             COALESCE(ucp.anual_consumption_p6,0)*COALESCE(ucp."precio_kwh_P6",0) +
+             COALESCE(NULLIF(ucp.power_p1,0::double precision),1::real)*COALESCE(ucp."precio_kw_P1",0)*365.0 +
+             COALESCE(ucp.power_p2,0)*COALESCE(ucp."precio_kw_P2",0)*365.0 +
+             COALESCE(ucp.power_p3,0)*COALESCE(ucp."precio_kw_P3",0)*365.0 +
+             COALESCE(ucp.power_p4,0)*COALESCE(ucp."precio_kw_P4",0)*365.0 +
+             COALESCE(ucp.power_p5,0)*COALESCE(ucp."precio_kw_P5",0)*365.0 +
+             COALESCE(ucp.power_p6,0)*COALESCE(ucp."precio_kw_P6",0)*365.0
+             - COALESCE(ucp.surpluses,0) * (182.5::double precision / NULLIF(ucp.days::numeric,0)) * COALESCE(ucp.autoconsumo_precio,0)
+            )
+            * 1.05113
+          ) * (1 + COALESCE(ucp."VAT",0))
+          -
+          (
+            COALESCE(ucp.total_consumption_price,0) / NULLIF(ucp.total_consumption,0) * COALESCE(ucp.total_anual_consumption,0) +
             COALESCE(ucp.power_p1,0)*COALESCE(ucp.price_pp1,0)*365.0 +
             COALESCE(ucp.power_p2,0)*COALESCE(ucp.price_pp2,0)*365.0 +
             COALESCE(ucp.power_p3,0)*COALESCE(ucp.price_pp3,0)*365.0 +
             COALESCE(ucp.power_p4,0)*COALESCE(ucp.price_pp4,0)*365.0 +
             COALESCE(ucp.power_p5,0)*COALESCE(ucp.price_pp5,0)*365.0 +
             COALESCE(ucp.power_p6,0)*COALESCE(ucp.price_pp6,0)*365.0
-          ) * 1.05113
-        ) * (1 + COALESCE(ucp."VAT",0))
+          ) * 1.05113 * (1 + COALESCE(ucp."VAT",0))
+        )
       ELSE 0.0
-    END AS savings_yearly
+    END AS savings_yearly,
+
+    -- EDITADO: Cálculo auxiliar según rate_i_have -> rate_i_want
+    CASE
+      -- misma modalidad (Fija->Fija o Indexada->Indexada): consumo anual con los CP de la tarifa nueva
+      WHEN ucp.rate_mode = ucp.rate_i_want THEN
+        (
+          COALESCE(ucp.anual_consumption_p1,0)*COALESCE(ucp.price_cp1,0) +
+          COALESCE(ucp.anual_consumption_p2,0)*COALESCE(ucp.price_cp2,0) +
+          COALESCE(ucp.anual_consumption_p3,0)*COALESCE(ucp.price_cp3,0) +
+          COALESCE(ucp.anual_consumption_p4,0)*COALESCE(ucp.price_cp4,0) +
+          COALESCE(ucp.anual_consumption_p5,0)*COALESCE(ucp.price_cp5,0) +
+          COALESCE(ucp.anual_consumption_p6,0)*COALESCE(ucp.price_cp6,0)
+        )
+
+      -- Indexada -> Fija: precios 2025 + fee_diff
+      WHEN ucp.rate_mode = 'indexada' AND ucp.rate_i_want = 'fija' THEN
+        (
+          COALESCE(ucp.anual_consumption_p1,0) * (0.19 + COALESCE(f.fee_diff,0)) +
+          COALESCE(ucp.anual_consumption_p2,0) * (0.15 + COALESCE(f.fee_diff,0)) +
+          COALESCE(ucp.anual_consumption_p3,0) * (0.13 + COALESCE(f.fee_diff,0)) +
+          COALESCE(ucp.anual_consumption_p4,0) * (0.12 + COALESCE(f.fee_diff,0)) +
+          COALESCE(ucp.anual_consumption_p5,0) * (0.11 + COALESCE(f.fee_diff,0)) +
+          COALESCE(ucp.anual_consumption_p6,0) * (0.10 + COALESCE(f.fee_diff,0))
+        )
+
+      -- Fija -> Indexada: usar los precio_kwh_P1..P6 (editables)
+      WHEN ucp.rate_mode = 'fija' AND ucp.rate_i_want = 'indexada' THEN
+        (
+          COALESCE(ucp.anual_consumption_p1,0) * COALESCE(ucp."precio_kwh_P1",0) +
+          COALESCE(ucp.anual_consumption_p2,0) * COALESCE(ucp."precio_kwh_P2",0) +
+          COALESCE(ucp.anual_consumption_p3,0) * COALESCE(ucp."precio_kwh_P3",0) +
+          COALESCE(ucp.anual_consumption_p4,0) * COALESCE(ucp."precio_kwh_P4",0) +
+          COALESCE(ucp.anual_consumption_p5,0) * COALESCE(ucp."precio_kwh_P5",0) +
+          COALESCE(ucp.anual_consumption_p6,0) * COALESCE(ucp."precio_kwh_P6",0)
+        )
+      ELSE 0
+    END AS new_total_price_mode
 
   FROM unified_calculated_prices ucp
   LEFT JOIN comparison_rates_crs crs
@@ -298,12 +291,7 @@ unified_extended_prices AS (
    AND (crs.max_kw_anual IS NULL OR ucp.total_anual_consumption <  crs.max_kw_anual)
    AND (crs.min_power   IS NULL OR ucp.power_p1 >= crs.min_power)
    AND (crs.max_power   IS NULL OR ucp.power_p1 <  crs.max_power)
-
-  -- Necesitamos los precios anuales indexados para el cálculo anterior
-  LEFT JOIN reference_indexed_annual_prices ria
-    ON ria.rate_type = '3_0'
-   AND ria.ref_year  = COALESCE(ucp.invoice_year, EXTRACT(YEAR FROM ucp.created_at)::int)
-   AND (ria.region IS NULL OR ria.region = ucp.region)
+  LEFT JOIN fee_calculated f ON f.id = ucp.id
 ),
 ranked_comparisons AS (
   SELECT
@@ -323,7 +311,6 @@ ranked_comparisons AS (
         END DESC
     ) AS rank
   FROM unified_extended_prices uep
-  WHERE (uep.rate_i_want IS NULL OR uep.rate_mode = uep.rate_i_want)
 ),
 all_comparisons_ranked AS (
   SELECT * FROM ranked_comparisons
@@ -476,7 +463,7 @@ SELECT DISTINCT
     * (1 + COALESCE(rc."VAT",0))
   ) AS new_total_price_with_vat,
 
-  -- new_total_yearly_price_with_vat (mantengo tu fórmula original de display)
+  -- new_total_yearly_price_with_vat
   (
     (
       COALESCE(rc.anual_consumption_p1,0::real) * COALESCE(rc.price_cp1,0::real) +
@@ -494,7 +481,7 @@ SELECT DISTINCT
     ) * (1::numeric + 0.05113)::double precision
   ) * (1::double precision + COALESCE(rc."VAT",0::real)) AS new_total_yearly_price_with_vat,
 
-  -- saving_percentage (como tenías)
+  -- saving_percentage (como estaba)
   (
     (
       (
