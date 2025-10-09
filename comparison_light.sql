@@ -175,6 +175,7 @@ tot AS (
         ) * (1.0::double precision + COALESCE(m."VAT", 0)::double precision)
     END AS new_total_price_with_vat_base,
 
+
     -- Precio anual NUEVO con IEE + VAT + mantenimiento anual
     (
       COALESCE(m.anual_consumption_p1,0::real)*COALESCE(m.price_cp1,0::real) +

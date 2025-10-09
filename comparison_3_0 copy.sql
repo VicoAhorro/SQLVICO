@@ -1,6 +1,6 @@
 --DROP VIEW IF EXISTS public._comparisons_detailed_3_0;
 
-CREATE OR REPLACE VIEW public._comparisons_detailed_3_0 AS
+-- CREATE OR REPLACE VIEW public._comparisons_detailed_3_0 AS
 WITH
 calculated_prices_3_0 AS (
   SELECT
@@ -86,7 +86,7 @@ calculated_prices_3_0 AS (
     (COALESCE(c30.power_p5,0)*COALESCE(cr.price_pp5,0)*COALESCE(c30.power_days,0))::double precision +
     (COALESCE(c30.power_p6,0)*COALESCE(cr.price_pp6,0)*COALESCE(c30.power_days,0))::double precision AS total_power_price,
 
-    -- Consumo mensual base con CP del candidato
+    -- Consumo mensual base con CP del candidato (se usará en otras fórmulas)
     COALESCE(c30.consumption_p1,0)*COALESCE(cr.price_cp1,0) +
     COALESCE(c30.consumption_p2,0)*COALESCE(cr.price_cp2,0) +
     COALESCE(c30.consumption_p3,0)*COALESCE(cr.price_cp3,0) +
@@ -94,7 +94,7 @@ calculated_prices_3_0 AS (
     COALESCE(c30.consumption_p5,0)*COALESCE(cr.price_cp5,0) +
     COALESCE(c30.consumption_p6,0)*COALESCE(cr.price_cp6,0) AS total_consumption_price,
 
-    -- NEW: new_total_price definitivo con transición + fee
+    -- NEW: new_total_price definitivo (mensual base) con transición + FEE ponderado
     (
       -- término de potencia
       (
@@ -106,7 +106,9 @@ calculated_prices_3_0 AS (
         COALESCE(c30.power_p6,0)*COALESCE(cr.price_pp6,0)*COALESCE(c30.power_days,0)::double precision
       )
       +
+      -- término de energía según pareja (have vs candidato)
       CASE
+        -- fija → fija  (usar CP del candidato)
         WHEN c30.rate_i_have = 'fija'     AND cr.rate_mode = 'fija' THEN
           COALESCE(c30.consumption_p1,0)*COALESCE(cr.price_cp1,0) +
           COALESCE(c30.consumption_p2,0)*COALESCE(cr.price_cp2,0) +
@@ -115,6 +117,7 @@ calculated_prices_3_0 AS (
           COALESCE(c30.consumption_p5,0)*COALESCE(cr.price_cp5,0) +
           COALESCE(c30.consumption_p6,0)*COALESCE(cr.price_cp6,0)
 
+        -- indexada → indexada (usar CP del candidato; ya reflejan mes/año si aplica)
         WHEN c30.rate_i_have = 'indexada' AND cr.rate_mode = 'indexada' THEN
           COALESCE(c30.consumption_p1,0)*COALESCE(cr.price_cp1,0) +
           COALESCE(c30.consumption_p2,0)*COALESCE(cr.price_cp2,0) +
@@ -123,16 +126,16 @@ calculated_prices_3_0 AS (
           COALESCE(c30.consumption_p5,0)*COALESCE(cr.price_cp5,0) +
           COALESCE(c30.consumption_p6,0)*COALESCE(cr.price_cp6,0)
 
-        -- Indexada → Fija: media indexada anual (tabla externa) + fee_diff
+        -- indexada → fija: referencia fija anual + FEE ponderado del mes
         WHEN c30.rate_i_have = 'indexada' AND cr.rate_mode = 'fija' THEN
-          COALESCE(c30.consumption_p1,0) * COALESCE(ria.price_p1 + COALESCE(fee.fee_diff,0), 0) +
-          COALESCE(c30.consumption_p2,0) * COALESCE(ria.price_p2 + COALESCE(fee.fee_diff,0), 0) +
-          COALESCE(c30.consumption_p3,0) * COALESCE(ria.price_p3 + COALESCE(fee.fee_diff,0), 0) +
-          COALESCE(c30.consumption_p4,0) * COALESCE(ria.price_p4 + COALESCE(fee.fee_diff,0), 0) +
-          COALESCE(c30.consumption_p5,0) * COALESCE(ria.price_p5 + COALESCE(fee.fee_diff,0), 0) +
-          COALESCE(c30.consumption_p6,0) * COALESCE(ria.price_p6 + COALESCE(fee.fee_diff,0), 0)
+          COALESCE(c30.consumption_p1,0) * COALESCE(rfix.price_p1 + COALESCE(fee.fee_diff,0), 0) +
+          COALESCE(c30.consumption_p2,0) * COALESCE(rfix.price_p2 + COALESCE(fee.fee_diff,0), 0) +
+          COALESCE(c30.consumption_p3,0) * COALESCE(rfix.price_p3 + COALESCE(fee.fee_diff,0), 0) +
+          COALESCE(c30.consumption_p4,0) * COALESCE(rfix.price_p4 + COALESCE(fee.fee_diff,0), 0) +
+          COALESCE(c30.consumption_p5,0) * COALESCE(rfix.price_p5 + COALESCE(fee.fee_diff,0), 0) +
+          COALESCE(c30.consumption_p6,0) * COALESCE(rfix.price_p6 + COALESCE(fee.fee_diff,0), 0)
 
-        -- Fija → Indexada: usar manuales
+        -- fija → indexada (usar precio_kwh editables del propio registro)
         WHEN c30.rate_i_have = 'fija'     AND cr.rate_mode = 'indexada' THEN
           COALESCE(c30.consumption_p1,0) * COALESCE(c30."precio_kwh_P1",0) +
           COALESCE(c30.consumption_p2,0) * COALESCE(c30."precio_kwh_P2",0) +
@@ -141,6 +144,7 @@ calculated_prices_3_0 AS (
           COALESCE(c30.consumption_p5,0) * COALESCE(c30."precio_kwh_P5",0) +
           COALESCE(c30.consumption_p6,0) * COALESCE(c30."precio_kwh_P6",0)
 
+        -- fallback: CP del candidato
         ELSE
           COALESCE(c30.consumption_p1,0)*COALESCE(cr.price_cp1,0) +
           COALESCE(c30.consumption_p2,0)*COALESCE(cr.price_cp2,0) +
@@ -185,15 +189,15 @@ calculated_prices_3_0 AS (
     c30.rate_i_want
 
   FROM comparison_3_0 c30
-
   LEFT JOIN comparison_rates cr
     ON cr.type = '3_0'
    AND cr.company <> c30.company
    AND (
-        cr.rate_mode::text <> 'indexada'
+        cr.rate_mode::text <> 'indexada'                                  -- si es Fija, no aplicar filtro de mes/año
         OR (
-          (cr.invoice_month IS NULL AND cr.invoice_year IS NULL)
-          OR (cr.invoice_month = c30.invoice_month AND cr.invoice_year = c30.invoice_year)
+          (cr.invoice_month IS NULL AND cr.invoice_year IS NULL)           -- si es Indexada, aceptar genérica (sin mes/año)
+          OR (cr.invoice_month = c30.invoice_month AND                     -- o específica que coincide con c30
+              cr.invoice_year  = c30.invoice_year)
         )
       )
    AND (
@@ -202,7 +206,7 @@ calculated_prices_3_0 AS (
         OR cr.subrate_name = c30.preferred_subrate
    )
 
-  -- NUEVO: indexada nuestra para calcular fee_diff (misma compañía y mes/año)
+  -- NUEVO: indexada de la MISMA compañía (para calcular FEE del mes/año)
   LEFT JOIN comparison_rates cr_idx
     ON cr_idx.type = '3_0'
    AND cr_idx.company = cr.company
@@ -212,42 +216,40 @@ calculated_prices_3_0 AS (
         OR (cr_idx.invoice_month = c30.invoice_month AND cr_idx.invoice_year = c30.invoice_year)
    )
 
-  -- NUEVO: fee_diff (media de diferencias positivas)
+  -- NUEVO: FEE ponderado por consumo del mes (suma(diff_pos * kWh) / suma(kWh))
   LEFT JOIN LATERAL (
-    SELECT COALESCE(AVG(x),0) AS fee_diff
-    FROM (
-      VALUES
-        (CASE WHEN c30."precio_kwh_P1" IS NOT NULL AND cr_idx.price_cp1 IS NOT NULL
-              THEN GREATEST(c30."precio_kwh_P1" - cr_idx.price_cp1, 0)::numeric END),
-        (CASE WHEN c30."precio_kwh_P2" IS NOT NULL AND cr_idx.price_cp2 IS NOT NULL
-              THEN GREATEST(c30."precio_kwh_P2" - cr_idx.price_cp2, 0)::numeric END),
-        (CASE WHEN c30."precio_kwh_P3" IS NOT NULL AND cr_idx.price_cp3 IS NOT NULL
-              THEN GREATEST(c30."precio_kwh_P3" - cr_idx.price_cp3, 0)::numeric END),
-        (CASE WHEN c30."precio_kwh_P4" IS NOT NULL AND cr_idx.price_cp4 IS NOT NULL
-              THEN GREATEST(c30."precio_kwh_P4" - cr_idx.price_cp4, 0)::numeric END),
-        (CASE WHEN c30."precio_kwh_P5" IS NOT NULL AND cr_idx.price_cp5 IS NOT NULL
-              THEN GREATEST(c30."precio_kwh_P5" - cr_idx.price_cp5, 0)::numeric END),
-        (CASE WHEN c30."precio_kwh_P6" IS NOT NULL AND cr_idx.price_cp6 IS NOT NULL
-              THEN GREATEST(c30."precio_kwh_P6" - cr_idx.price_cp6, 0)::numeric END)
-    ) v(x)
+    SELECT COALESCE(
+             (
+               (COALESCE(GREATEST(c30."precio_kwh_P1" - cr_idx.price_cp1, 0),0) * COALESCE(c30.consumption_p1,0)) +
+               (COALESCE(GREATEST(c30."precio_kwh_P2" - cr_idx.price_cp2, 0),0) * COALESCE(c30.consumption_p2,0)) +
+               (COALESCE(GREATEST(c30."precio_kwh_P3" - cr_idx.price_cp3, 0),0) * COALESCE(c30.consumption_p3,0)) +
+               (COALESCE(GREATEST(c30."precio_kwh_P4" - cr_idx.price_cp4, 0),0) * COALESCE(c30.consumption_p4,0)) +
+               (COALESCE(GREATEST(c30."precio_kwh_P5" - cr_idx.price_cp5, 0),0) * COALESCE(c30.consumption_p5,0)) +
+               (COALESCE(GREATEST(c30."precio_kwh_P6" - cr_idx.price_cp6, 0),0) * COALESCE(c30.consumption_p6,0))
+             )
+             /
+             NULLIF(
+               ( (CASE WHEN c30."precio_kwh_P1" IS NOT NULL AND cr_idx.price_cp1 IS NOT NULL THEN COALESCE(c30.consumption_p1,0) ELSE 0 END) +
+                 (CASE WHEN c30."precio_kwh_P2" IS NOT NULL AND cr_idx.price_cp2 IS NOT NULL THEN COALESCE(c30.consumption_p2,0) ELSE 0 END) +
+                 (CASE WHEN c30."precio_kwh_P3" IS NOT NULL AND cr_idx.price_cp3 IS NOT NULL THEN COALESCE(c30.consumption_p3,0) ELSE 0 END) +
+                 (CASE WHEN c30."precio_kwh_P4" IS NOT NULL AND cr_idx.price_cp4 IS NOT NULL THEN COALESCE(c30.consumption_p4,0) ELSE 0 END) +
+                 (CASE WHEN c30."precio_kwh_P5" IS NOT NULL AND cr_idx.price_cp5 IS NOT NULL THEN COALESCE(c30.consumption_p5,0) ELSE 0 END) +
+                 (CASE WHEN c30."precio_kwh_P6" IS NOT NULL AND cr_idx.price_cp6 IS NOT NULL THEN COALESCE(c30.consumption_p6,0) ELSE 0 END) ),
+               0
+             )
+           , 0
+           ) AS fee_diff
   ) fee ON TRUE
 
-  -- NUEVO: media indexada anual (tabla externa)
-  LEFT JOIN reference_indexed_annual_prices ria
-    ON ria.rate_type = '3_0'
-   AND ria.ref_year  = COALESCE(c30.invoice_year, EXTRACT(YEAR FROM c30.created_at)::int)
-   AND (ria.region IS NULL OR ria.region = c30.region)
-
-  -- (SI LA NECESITAS) referencia fija
+  -- Referencia fija anual (P1..P6) que ya usabas
   LEFT JOIN reference_fixed_energy_prices rfix
-    ON rfix.rate_type = '3_0'
+    ON rfix.rate_type = '3_0'                            -- este view es 3_0
    AND rfix.ref_year  = COALESCE(c30.invoice_year, EXTRACT(YEAR FROM c30.created_at)::int)
-   AND (rfix.region IS NULL OR rfix.region = c30.region)
+   AND (rfix.region IS NULL OR rfix.region = c30.region) -- opcional si usas región
 
   WHERE (c30.deleted IS NULL OR c30.deleted = FALSE)
     AND (c30.region IS NULL OR c30.region = ANY (cr.region))
 ),
-,
 
 unified_calculated_prices AS (
   SELECT * FROM calculated_prices_3_0
@@ -283,21 +285,22 @@ unified_extended_prices AS (
     COALESCE(ucp.power_p6,0)*COALESCE(crs.crs_pp6,0) +
     COALESCE(crs.fixed_crs,0) AS total_crs,
 
-    -- ====== NEW: savings_yearly con transición (energía anual) ======
+    -- NEW: savings_yearly con transición (energía anual según caso + potencia anual)
     CASE
       WHEN ucp.new_company IS NOT NULL THEN
         (
           (
-            -- ENERGÍA ANUAL NUEVA según transición
             CASE
+              -- Indexada → Fija: referencia fija anual + fee_diff (mismo fee mensual aplicado como ajuste anual)
               WHEN ucp.rate_i_have = 'indexada' AND ucp.rate_mode = 'fija' THEN
-                COALESCE(ucp.anual_consumption_p1,0) * COALESCE(ria.price_p1 + ucp.fee_diff,0) +
-                COALESCE(ucp.anual_consumption_p2,0) * COALESCE(ria.price_p2 + ucp.fee_diff,0) +
-                COALESCE(ucp.anual_consumption_p3,0) * COALESCE(ria.price_p3 + ucp.fee_diff,0) +
-                COALESCE(ucp.anual_consumption_p4,0) * COALESCE(ria.price_p4 + ucp.fee_diff,0) +
-                COALESCE(ucp.anual_consumption_p5,0) * COALESCE(ria.price_p5 + ucp.fee_diff,0) +
-                COALESCE(ucp.anual_consumption_p6,0) * COALESCE(ria.price_p6 + ucp.fee_diff,0)
+                COALESCE(ucp.anual_consumption_p1,0) * COALESCE(rfix.price_p1 + COALESCE(ucp.fee_diff,0),0) +
+                COALESCE(ucp.anual_consumption_p2,0) * COALESCE(rfix.price_p2 + COALESCE(ucp.fee_diff,0),0) +
+                COALESCE(ucp.anual_consumption_p3,0) * COALESCE(rfix.price_p3 + COALESCE(ucp.fee_diff,0),0) +
+                COALESCE(ucp.anual_consumption_p4,0) * COALESCE(rfix.price_p4 + COALESCE(ucp.fee_diff,0),0) +
+                COALESCE(ucp.anual_consumption_p5,0) * COALESCE(rfix.price_p5 + COALESCE(ucp.fee_diff,0),0) +
+                COALESCE(ucp.anual_consumption_p6,0) * COALESCE(rfix.price_p6 + COALESCE(ucp.fee_diff,0),0)
 
+              -- Fija → Indexada: usar los editables manuales
               WHEN ucp.rate_i_have = 'fija'     AND ucp.rate_mode = 'indexada' THEN
                 COALESCE(ucp.anual_consumption_p1,0) * COALESCE(ucp."precio_kwh_P1",0) +
                 COALESCE(ucp.anual_consumption_p2,0) * COALESCE(ucp."precio_kwh_P2",0) +
@@ -306,8 +309,8 @@ unified_extended_prices AS (
                 COALESCE(ucp.anual_consumption_p5,0) * COALESCE(ucp."precio_kwh_P5",0) +
                 COALESCE(ucp.anual_consumption_p6,0) * COALESCE(ucp."precio_kwh_P6",0)
 
+              -- fija→fija o indexada→indexada: CP del candidato
               ELSE
-                -- fija→fija o indexada→indexada: CP del candidato
                 COALESCE(ucp.anual_consumption_p1,0)*COALESCE(ucp.price_cp1,0) +
                 COALESCE(ucp.anual_consumption_p2,0)*COALESCE(ucp.price_cp2,0) +
                 COALESCE(ucp.anual_consumption_p3,0)*COALESCE(ucp.price_cp3,0) +
@@ -316,7 +319,7 @@ unified_extended_prices AS (
                 COALESCE(ucp.anual_consumption_p6,0)*COALESCE(ucp.price_cp6,0)
             END
             +
-            -- POTENCIA ANUAL (igual que antes)
+            -- Potencia anual (igual que antes)
             COALESCE(ucp.power_p1,0)*COALESCE(ucp.price_pp1,0)*365.0 +
             COALESCE(ucp.power_p2,0)*COALESCE(ucp.price_pp2,0)*365.0 +
             COALESCE(ucp.power_p3,0)*COALESCE(ucp.price_pp3,0)*365.0 +
@@ -336,12 +339,13 @@ unified_extended_prices AS (
    AND (crs.min_power   IS NULL OR ucp.power_p1 >= crs.min_power)
    AND (crs.max_power   IS NULL OR ucp.power_p1 <  crs.max_power)
 
-  -- Necesitamos los precios anuales indexados para el cálculo anterior
-  LEFT JOIN reference_indexed_annual_prices ria
-    ON ria.rate_type = '3_0'
-   AND ria.ref_year  = COALESCE(ucp.invoice_year, EXTRACT(YEAR FROM ucp.created_at)::int)
-   AND (ria.region IS NULL OR ria.region = ucp.region)
+  -- Necesitamos rfix también aquí para anualizados (mismo criterio que en el CTE anterior)
+  LEFT JOIN reference_fixed_energy_prices rfix
+    ON rfix.rate_type = '3_0'
+   AND rfix.ref_year  = COALESCE(ucp.invoice_year, EXTRACT(YEAR FROM ucp.created_at)::int)
+   AND (rfix.region IS NULL OR rfix.region = ucp.region)
 ),
+
 ranked_comparisons AS (
   SELECT
     uep.*,
@@ -362,6 +366,7 @@ ranked_comparisons AS (
   FROM unified_extended_prices uep
   WHERE (uep.rate_i_want IS NULL OR uep.rate_mode = uep.rate_i_want)
 ),
+
 all_comparisons_ranked AS (
   SELECT * FROM ranked_comparisons
 )
@@ -513,7 +518,7 @@ SELECT DISTINCT
     * (1 + COALESCE(rc."VAT",0))
   ) AS new_total_price_with_vat,
 
-  -- new_total_yearly_price_with_vat (mantengo tu fórmula original de display)
+  -- new_total_yearly_price_with_vat (display original)
   (
     (
       COALESCE(rc.anual_consumption_p1,0::real) * COALESCE(rc.price_cp1,0::real) +
@@ -531,7 +536,7 @@ SELECT DISTINCT
     ) * (1::numeric + 0.05113)::double precision
   ) * (1::double precision + COALESCE(rc."VAT",0::real)) AS new_total_yearly_price_with_vat,
 
-  -- saving_percentage (como tenías)
+  -- saving_percentage (como estaba)
   (
     (
       (
