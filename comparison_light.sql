@@ -1,6 +1,6 @@
  --DROP VIEW IF EXISTS public._comparisons_detailed_light;
 
--- CREATE OR REPLACE VIEW public._comparisons_detailed_light AS
+CREATE OR REPLACE VIEW public._comparisons_detailed_light AS
 CREATE OR REPLACE VIEW public._comparisons_detailed_light AS
 WITH
 
@@ -160,18 +160,28 @@ tot AS (
     (m.m_consumo + m.m_potencia) * 0.05113::double precision                                     AS iee_monthly,
 
     -- Calcular base sin mantenimiento primero
-    ((COALESCE(m.new_total_price, 0) * 1.05113 + COALESCE(m.equipment_rental, 0)) * (1 + COALESCE(m."VAT", 0))) 
-    AS new_total_price_with_vat_base,
+    CASE
+      WHEN m.tarifa_plana = TRUE THEN
+       ( (
+          (COALESCE(m.new_total_price, 0)::double precision * 1.05113::double precision)
+          + COALESCE(m.equipment_rental, 0)::double precision
+        ) * (1.0::double precision + COALESCE(m."VAT", 0)::double precision))
+      ELSE
+        ((
+          (COALESCE(m.new_total_price, 0)::double precision * 1.05113::double precision)
+          + COALESCE(m.equipment_rental, 0)::double precision
+        ) * (1.0::double precision + COALESCE(m."VAT", 0)::double precision))
+    END AS new_total_price_with_vat_base,
 
 
     -- Precio anual NUEVO con IEE + VAT + mantenimiento anual
-    (
+    ((
       COALESCE(m.anual_consumption_p1,0::real)*COALESCE(m.price_cp1,0::real) +
       COALESCE(m.anual_consumption_p2,0::real)*COALESCE(m.price_cp2,0::real) +
       COALESCE(m.anual_consumption_p3,0::real)*COALESCE(m.price_cp3,0::real) +
       COALESCE(NULLIF(m.power_p1,0::double precision),1::real)*COALESCE(m.price_pp1,0::real)*365::double precision +
       COALESCE(m.power_p2,0::real)*COALESCE(m.price_pp2,0::real)*365::double precision
-    ) * (1 + 0.05113::double precision) * (1 + COALESCE(m."VAT",0::real)) 
+    ) * (1 + 0.05113::double precision) * (1 + COALESCE(m."VAT",0::real))) 
     + (COALESCE(m.daily_maintenance_with_vat, 0) * 365) AS new_total_yearly_price_with_vat,
 
     -- Precio anual ACTUAL con IEE + VAT (para savings_yearly)
@@ -208,7 +218,7 @@ with_crs AS (
           t.new_total_price_with_vat_base + COALESCE(t.maintenance_total, 0)
         )
       ELSE 0.0::double precision
-    END AS savings,
+    END                                                                                AS savings,
     -- Ahorro anual (actual anual - nuevo anual con mantenimiento)
     CASE
       WHEN t.tarifa_plana = TRUE THEN
