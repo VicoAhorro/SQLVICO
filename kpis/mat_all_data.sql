@@ -64,11 +64,13 @@ SELECT
   c.fecha_baja,                      -- 25
   c.baja_firma_delegada,             -- 26
   c.firma_date,                      -- 27
-  lvc.valuation_id          AS valuation_id,          -- 28 (desde última valoración del contrato)
+  lvc.valuation_id          AS valuation_id,          -- 28
   lvc.valuation_created_at  AS valuation_created_at,  -- 29
   lvc.pdf_proposal          AS pdf_proposal,          -- 30
-  lcc.comparison_id         AS comparison_id,         -- 31 (última comparación de esa valoración)
-  lcc.comparison_created_at AS comparison_created_at  -- 32
+  lcc.comparison_id         AS comparison_id,         -- 31
+  lcc.comparison_created_at AS comparison_created_at, -- 32
+  c.deleted                 AS deleted,               -- 33
+  NULL::text                AS deleted_reason         -- 34
 FROM public._contracts_detailed c
 JOIN public.users u ON u.user_id = c.advisor_id
 LEFT JOIN latest_val_by_contract lvc ON lvc.contract_id = c.id
@@ -108,7 +110,9 @@ SELECT
   v.created_at        AS valuation_created_at, -- 29
   v.pdf_proposal      AS pdf_proposal,        -- 30
   c.id                AS comparison_id,       -- 31
-  c.created_at        AS comparison_created_at -- 32
+  c.created_at        AS comparison_created_at, -- 32
+  c.deleted           AS deleted,             -- 33
+  NULL::text          AS deleted_reason            -- 34
 FROM public.mat_comparisons_historic c
 LEFT JOIN public._valuations_detailed v ON v.id = c.valuation_id
 LEFT JOIN public.users u ON u.user_id = c.advisor_id
@@ -147,7 +151,9 @@ SELECT
   v.created_at       AS valuation_created_at, -- 29
   v.pdf_proposal     AS pdf_proposal,    -- 30
   NULL::uuid         AS comparison_id,   -- 31
-  NULL::timestamp    AS comparison_created_at -- 32
+  NULL::timestamp    AS comparison_created_at, -- 32
+  v.deleted     AS deleted,         -- 33
+  v.deleted_reason   AS deleted_reason   -- 34
 FROM public._valuations_detailed v
 LEFT JOIN public.users u ON u.user_id = v.advisor_id
 
@@ -173,7 +179,7 @@ SELECT
   NULL::text       AS new_rate_name, -- 17
   NULL::text       AS new_subrate,   -- 18
   NULL::double precision AS saving_percentage, -- 19
-  lc.pdf_invoice,                    -- 20 (última comparación)
+  lc.pdf_invoice,                    -- 20
   cl.total_savings,                  -- 21
   NULL::text       AS "CUPS",        -- 22
   NULL::text       AS status,        -- 23
@@ -185,7 +191,9 @@ SELECT
   lv.valuation_created_at,           -- 29
   lv.pdf_proposal,                   -- 30
   lc.comparison_id,                  -- 31
-  lc.comparison_created_at           -- 32
+  lc.comparison_created_at,          -- 32
+  NULL::boolean        AS deleted,      -- 33
+  NULL::text        AS deleted_reason-- 34
 FROM public._clients_detailed cl
 LEFT JOIN public.users u ON u.user_id = cl.advisor_id
 LEFT JOIN latest_val lv

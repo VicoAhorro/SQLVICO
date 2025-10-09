@@ -1,6 +1,6 @@
  --DROP VIEW IF EXISTS public._comparisons_detailed_light;
 
-CREATE OR REPLACE VIEW public._comparisons_detailed_light AS
+-- CREATE OR REPLACE VIEW public._comparisons_detailed_light AS
 CREATE OR REPLACE VIEW public._comparisons_detailed_light AS
 WITH
 
@@ -104,8 +104,6 @@ base AS (
    AND (
         (CL.wants_permanence = TRUE AND cr.has_permanence = TRUE)
         OR (cl.wants_permanence IS NOT TRUE)
-        (CL.wants_permanence = TRUE AND cr.has_permanence = TRUE)
-        OR (cl.wants_permanence IS NOT TRUE)
    )
   WHERE cl.deleted IS DISTINCT FROM TRUE
 ),
@@ -162,18 +160,8 @@ tot AS (
     (m.m_consumo + m.m_potencia) * 0.05113::double precision                                     AS iee_monthly,
 
     -- Calcular base sin mantenimiento primero
-    CASE
-      WHEN m.tarifa_plana = TRUE THEN
-        (
-          (COALESCE(m.new_total_price, 0)::double precision * 1.05113::double precision)
-          + COALESCE(m.equipment_rental, 0)::double precision
-        ) * (1.0::double precision + COALESCE(m."VAT", 0)::double precision)
-      ELSE
-        (
-          (COALESCE(m.new_total_price, 0)::double precision * 1.05113::double precision)
-          + COALESCE(m.equipment_rental, 0)::double precision
-        ) * (1.0::double precision + COALESCE(m."VAT", 0)::double precision)
-    END AS new_total_price_with_vat_base,
+    ((COALESCE(m.new_total_price, 0) * 1.05113 + COALESCE(m.equipment_rental, 0)) * (1 + COALESCE(m."VAT", 0))) 
+    AS new_total_price_with_vat_base,
 
 
     -- Precio anual NUEVO con IEE + VAT + mantenimiento anual
@@ -216,7 +204,9 @@ with_crs AS (
       WHEN t.new_company IS NOT NULL THEN
         COALESCE(t.current_total_invoice, 0::real)::double precision
         -
-        t.new_total_price_with_vat_base
+        (
+          t.new_total_price_with_vat_base + COALESCE(t.maintenance_total, 0)
+        )
       ELSE 0.0::double precision
     END AS savings,
     -- Ahorro anual (actual anual - nuevo anual con mantenimiento)

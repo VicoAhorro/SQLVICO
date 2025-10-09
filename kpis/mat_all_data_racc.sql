@@ -30,7 +30,9 @@ select
   mat_all_data.valuation_created_at,
   mat_all_data.pdf_proposal,
   mat_all_data.comparison_id,
-  mat_all_data.comparison_created_at
+  mat_all_data.comparison_created_at,
+  mat_all_data.deleted,
+  mat_all_data.deleted_reason
 from
   mat_all_data
 where
