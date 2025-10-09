@@ -1,6 +1,7 @@
  --DROP VIEW IF EXISTS public._comparisons_detailed_light;
 
 CREATE OR REPLACE VIEW public._comparisons_detailed_light AS
+CREATE OR REPLACE VIEW public._comparisons_detailed_light AS
 WITH
 
 -- ====== Base con tarifas candidatas ======
@@ -101,6 +102,8 @@ base AS (
    )
    AND (cl.region IS NULL OR cl.region = ANY (cr.region))
    AND (
+        (CL.wants_permanence = TRUE AND cr.has_permanence = TRUE)
+        OR (cl.wants_permanence IS NOT TRUE)
         (CL.wants_permanence = TRUE AND cr.has_permanence = TRUE)
         OR (cl.wants_permanence IS NOT TRUE)
    )

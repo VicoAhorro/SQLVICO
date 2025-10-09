@@ -150,7 +150,12 @@ WITH calculated_prices_3_0 AS (
    AND cr.company <> c30.company
   AND (
         cr.rate_mode::text <> 'indexada'                                  -- si es Fija, no aplicar filtro de mes/año
+  AND (
+        cr.rate_mode::text <> 'indexada'                                  -- si es Fija, no aplicar filtro de mes/año
         OR (
+          (cr.invoice_month IS NULL AND cr.invoice_year IS NULL)           -- si es Indexada, aceptar genérica (sin mes/año)
+          OR (cr.invoice_month = c30.invoice_month AND                     -- o específica que coincide con c30
+              cr.invoice_year  = c30.invoice_year)
           (cr.invoice_month IS NULL AND cr.invoice_year IS NULL)           -- si es Indexada, aceptar genérica (sin mes/año)
           OR (cr.invoice_month = c30.invoice_month AND                     -- o específica que coincide con c30
               cr.invoice_year  = c30.invoice_year)
@@ -163,6 +168,7 @@ WITH calculated_prices_3_0 AS (
    )
    AND (
         (c30.wants_permanence = TRUE AND cr.has_permanence = TRUE)
+        OR (c30.wants_permanence IS NOT TRUE)
         OR (c30.wants_permanence IS NOT TRUE)
    )
   WHERE (c30.deleted IS NULL OR c30.deleted = FALSE)
@@ -408,6 +414,7 @@ SELECT DISTINCT
     * (1 + COALESCE(rc."VAT",0::real))
   ) AS new_total_price_with_vat,
 
+  -- new_total_yearly_price_with_vat
   -- new_total_yearly_price_with_vat
   (
     (
