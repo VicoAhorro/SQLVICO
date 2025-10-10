@@ -1,4 +1,4 @@
---DROP VIEW IF EXISTS public._comparisons_detailed_gas;
+-- DROP VIEW IF EXISTS public._comparisons_detailed_gas;
 
 CREATE OR REPLACE VIEW public._comparisons_detailed_gas AS
 WITH
@@ -124,24 +124,42 @@ calculated_prices_gas AS (
     cr.rate_mode
   FROM comparison_gas cg
   LEFT JOIN comparison_rates cr
-    ON cr.type = 'gas'
-   AND cr.company <> cg.company
-   AND cr.subrate_name = cg.rate_name
-   AND (
-        (cr.invoice_month IS NULL AND cr.invoice_year IS NULL)
-        OR (cr.invoice_month = cg.invoice_month AND cr.invoice_year = cg.invoice_year)
-   )
-   AND (
-        cg.preferred_subrate IS NULL
-        OR cg.preferred_subrate = ''
-        OR cr.subrate_name = cg.rate_name
-   )
-   AND (
-        (cg.wants_permanence = TRUE AND cr.has_permanence = TRUE)
-        OR (cg.wants_permanence IS NOT TRUE)
-   )   
-  WHERE (cg.deleted IS NULL OR cg.deleted = FALSE)
-    AND (cg.region IS NULL OR cg.region = ANY (cr.region))
+  ON cr.type = 'gas'
+ AND cr.company <> cg.company
+ AND cr.subrate_name = cg.rate_name
+ AND (
+      (cr.invoice_month IS NULL AND cr.invoice_year IS NULL)
+      OR (cr.invoice_month = cg.invoice_month AND cr.invoice_year = cg.invoice_year)
+ )
+ AND (
+      cg.preferred_subrate IS NULL
+      OR cg.preferred_subrate = ''
+      OR cr.subrate_name = cg.rate_name
+ )
+ -- ⬇️ Fallback de permanencia:
+ AND (
+      cg.wants_permanence IS NOT TRUE                        -- el cliente no pidió permanencia → acepta cualquiera
+      OR cr.has_permanence = TRUE                            -- hay permanencia y la tarifa la tiene
+      OR NOT EXISTS (                                         -- Fallback: si NO hay ninguna con permanencia,
+        SELECT 1                                              -- ignora la condición y acepta cualquiera
+        FROM comparison_rates crp
+        WHERE crp.type = 'gas'
+          AND crp.company <> cg.company
+          AND crp.subrate_name = cg.rate_name
+          AND (
+               (crp.invoice_month IS NULL AND crp.invoice_year IS NULL)
+               OR (crp.invoice_month = cg.invoice_month AND crp.invoice_year = cg.invoice_year)
+          )
+          AND (cg.region IS NULL OR cg.region = ANY (crp.region))
+          AND (
+               cg.preferred_subrate IS NULL
+               OR cg.preferred_subrate = ''
+               OR crp.subrate_name = cg.rate_name
+          )
+          AND crp.has_permanence = TRUE
+      )
+ )
+ AND (cg.region IS NULL OR cg.region = ANY (cr.region))
 ),
 unified_calculated_prices AS (
   SELECT * FROM calculated_prices_gas
