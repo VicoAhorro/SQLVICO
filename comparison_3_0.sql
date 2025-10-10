@@ -1,4 +1,4 @@
-DROP VIEW IF EXISTS public._comparisons_detailed_3_0;
+-- DROP VIEW IF EXISTS public._comparisons_detailed_3_0;
 
 CREATE OR REPLACE VIEW public._comparisons_detailed_3_0 AS
 WITH calculated_prices_3_0 AS (
@@ -146,31 +146,47 @@ WITH calculated_prices_3_0 AS (
     
   FROM comparison_3_0 c30
   LEFT JOIN comparison_rates cr
-    ON cr.type = '3_0'
-   AND cr.company <> c30.company
-  AND (
-        cr.rate_mode::text <> 'indexada'                                  -- si es Fija, no aplicar filtro de mes/año
-  AND (
-        cr.rate_mode::text <> 'indexada'                                  -- si es Fija, no aplicar filtro de mes/año
-        OR (
-          (cr.invoice_month IS NULL AND cr.invoice_year IS NULL)           -- si es Indexada, aceptar genérica (sin mes/año)
-          OR (cr.invoice_month = c30.invoice_month AND                     -- o específica que coincide con c30
-              cr.invoice_year  = c30.invoice_year)
-          (cr.invoice_month IS NULL AND cr.invoice_year IS NULL)           -- si es Indexada, aceptar genérica (sin mes/año)
-          OR (cr.invoice_month = c30.invoice_month AND                     -- o específica que coincide con c30
-              cr.invoice_year  = c30.invoice_year)
-        )
+  ON cr.type = '3_0'
+    AND cr.company <> c30.company
+    -- Filtro de mes/año solo si la tarifa es indexada
+    AND (
+          cr.rate_mode::text <> 'indexada'
+          OR (
+              (cr.invoice_month IS NULL AND cr.invoice_year IS NULL)
+            OR (cr.invoice_month = c30.invoice_month AND cr.invoice_year = c30.invoice_year)
+          )
+    )
+    -- Subrate preferida (si hay)
+    AND (
+          c30.preferred_subrate IS NULL
+          OR c30.preferred_subrate = ''
+          OR cr.subrate_name = c30.preferred_subrate
+    )
+  -- ⬇️ Fallback de permanencia (igual que en GAS):
+ AND (
+      c30.wants_permanence IS NOT TRUE        -- no pidió permanencia → acepta cualquiera
+      OR cr.has_permanence = TRUE             -- la pidió y esta tarifa la tiene
+      OR NOT EXISTS (                         -- la pidió pero NO hay ninguna con permanencia → ignora la condición
+           SELECT 1
+           FROM comparison_rates crp
+           WHERE crp.type = '3_0'
+             AND crp.company <> c30.company
+             AND (
+                  crp.rate_mode::text <> 'indexada'
+                  OR (
+                       (crp.invoice_month IS NULL AND crp.invoice_year IS NULL)
+                    OR (crp.invoice_month = c30.invoice_month AND crp.invoice_year = c30.invoice_year)
+                  )
+             )
+             AND (
+                  c30.preferred_subrate IS NULL
+                  OR c30.preferred_subrate = ''
+                  OR crp.subrate_name = c30.preferred_subrate
+             )
+             AND (c30.region IS NULL OR c30.region = ANY (crp.region))
+             AND crp.has_permanence = TRUE
       )
-   AND (
-        c30.preferred_subrate IS NULL
-        OR c30.preferred_subrate = ''
-        OR cr.subrate_name = c30.preferred_subrate
-   )
-   AND (
-        (c30.wants_permanence = TRUE AND cr.has_permanence = TRUE)
-        OR (c30.wants_permanence IS NOT TRUE)
-        OR (c30.wants_permanence IS NOT TRUE)
-   )
+ )
   WHERE (c30.deleted IS NULL OR c30.deleted = FALSE)
     AND (c30.region IS NULL OR c30.region = ANY (cr.region))
 ),

@@ -85,29 +85,47 @@ base AS (
 
   FROM comparison_light cl
   LEFT JOIN comparison_rates cr
-    ON cr.type = 'light'
-   AND cr.company <> cl.company
-   AND (
+  ON cr.type = 'light'
+  AND cr.company <> cl.company
+  AND (
         (cr.invoice_month IS NULL AND cr.invoice_year IS NULL)
-        OR (cr.invoice_month = cl.invoice_month AND cr.invoice_year = cl.invoice_year)
-   )
-   AND (
+    OR (cr.invoice_month = cl.invoice_month AND cr.invoice_year = cl.invoice_year)
+  )
+  AND (
         cl.preferred_subrate IS NULL
         OR cl.preferred_subrate = ''
         OR cr.subrate_name = cl.preferred_subrate
-   )
-   AND (
+  )
+  AND (
         (cl.selfconsumption = TRUE AND cr.selfconsumption = TRUE)
         OR (cl.selfconsumption = FALSE)
-   )
-   AND (cl.region IS NULL OR cl.region = ANY (cr.region))
-   AND (
-        (CL.wants_permanence = TRUE AND cr.has_permanence = TRUE)
-        OR (cl.wants_permanence IS NOT TRUE)
-   )
-  WHERE cl.deleted IS DISTINCT FROM TRUE
-),
-
+  )
+  AND (cl.region IS NULL OR cl.region = ANY (cr.region))
+  AND (
+        cl.wants_permanence IS NOT TRUE
+        OR cr.has_permanence = TRUE
+        OR NOT EXISTS (
+            SELECT 1
+            FROM comparison_rates crp
+            WHERE crp.type = 'light'
+              AND crp.company <> cl.company
+              AND (
+                    (crp.invoice_month IS NULL AND crp.invoice_year IS NULL)
+                OR (crp.invoice_month = cl.invoice_month AND crp.invoice_year = cl.invoice_year)
+              )
+              AND (
+                    cl.preferred_subrate IS NULL
+                    OR cl.preferred_subrate = ''
+                    OR crp.subrate_name = cl.preferred_subrate
+              )
+              AND (
+                    (cl.selfconsumption = TRUE AND crp.selfconsumption = TRUE)
+                    OR (cl.selfconsumption = FALSE)
+              )
+              AND (cl.region IS NULL OR cl.region = ANY (crp.region))
+              AND crp.has_permanence = TRUE
+        )
+  ),
 -- ====== Metrizaciones mensuales y totales base ======
 m_calc AS (
   SELECT
