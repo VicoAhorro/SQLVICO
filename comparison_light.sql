@@ -125,6 +125,7 @@ base AS (
               AND (cl.region IS NULL OR cl.region = ANY (crp.region))
               AND crp.has_permanence = TRUE
         )
+      )
   ),
 -- ====== Metrizaciones mensuales y totales base ======
 m_calc AS (
