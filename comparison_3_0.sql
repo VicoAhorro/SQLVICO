@@ -187,6 +187,7 @@ WITH calculated_prices_3_0 AS (
              AND crp.has_permanence = TRUE
       )
  )
+ AND (cr.cif IS NULL OR cr.cif = c30.cif)
   WHERE (c30.deleted IS NULL OR c30.deleted = FALSE)
     AND (c30.region IS NULL OR c30.region = ANY (cr.region))
 ),

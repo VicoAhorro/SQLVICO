@@ -131,6 +131,7 @@ calculated_prices_gas AS (
       (cr.invoice_month IS NULL AND cr.invoice_year IS NULL)
       OR (cr.invoice_month = cg.invoice_month AND cr.invoice_year = cg.invoice_year)
  )
+ AND (cr.cif IS NULL OR cr.cif = cg.cif)
  AND (
       cg.preferred_subrate IS NULL
       OR cg.preferred_subrate = ''
@@ -661,4 +662,4 @@ LEFT JOIN _users_supervisors us ON rc.advisor_id = us.user_id
 LEFT JOIN users u             ON u.user_id = rc.advisor_id
 WHERE rc.rank = 1
   AND (rc.deleted IS NULL OR rc.deleted = FALSE)
-  AND rc.type = 'gas';
+  AND rc.type = 'gas'
