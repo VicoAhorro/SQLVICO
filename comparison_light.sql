@@ -1,7 +1,6 @@
  --DROP VIEW IF EXISTS public._comparisons_detailed_light;
 
 CREATE OR REPLACE VIEW public._comparisons_detailed_light AS
-CREATE OR REPLACE VIEW public._comparisons_detailed_light AS
 WITH
 
 -- ====== Base con tarifas candidatas ======
@@ -90,15 +89,6 @@ base AS (
   AND (
         (cr.invoice_month IS NULL AND cr.invoice_year IS NULL)
     OR (cr.invoice_month = cl.invoice_month AND cr.invoice_year = cl.invoice_year)
-  )
-  AND (
-        cl.preferred_subrate IS NULL
-        OR cl.preferred_subrate = ''
-        OR cr.subrate_name = cl.preferred_subrate
-  )
-  AND (
-        (cl.selfconsumption = TRUE AND cr.selfconsumption = TRUE)
-        OR (cl.selfconsumption = FALSE)
   )
   AND (cl.region IS NULL OR cl.region = ANY (cr.region))
   AND (
@@ -257,24 +247,54 @@ with_crs AS (
 ),
 
 -- ====== Ranking ======
-ranked AS (
+rank_prep AS (
   SELECT
     w.*,
+    (NULLIF(w.preferred_subrate, '') IS NOT NULL) AS has_subrate_pref,
+    (NULLIF(w.preferred_subrate, '') IS NOT NULL AND w.new_subrate_name = w.preferred_subrate) AS subrate_match
+  FROM with_crs w
+),
+
+-- Agrega por id para saber si EXISTE al menos un match de subrate preferida
+subrate_exist AS (
+  SELECT
+    id,
+    BOOL_OR(subrate_match) AS exists_subrate_match_for_id
+  FROM rank_prep
+  GROUP BY id
+),
+
+-- Ranking final con prioridad por subrate cuando exista al menos una coincidencia
+ranked AS (
+  SELECT
+    rp.*,
+    se.exists_subrate_match_for_id,
+
     CASE
-      WHEN w.new_company IS NOT NULL AND w.savings_yearly > 0
-        THEN w.savings_yearly + COALESCE(w.total_crs,0::real)::double precision * 4.0
-      ELSE w.savings_yearly + COALESCE(w.total_crs,0::real)::double precision * 4.0
+      WHEN rp.new_company IS NOT NULL AND rp.savings_yearly > 0
+        THEN rp.savings_yearly + COALESCE(rp.total_crs,0::real)::double precision * 4.0
+      ELSE rp.savings_yearly + COALESCE(rp.total_crs,0::real)::double precision * 4.0
     END AS ranked_crs,
+
     ROW_NUMBER() OVER (
-      PARTITION BY w.id
+      PARTITION BY rp.id
       ORDER BY
+        -- 1) Si hay preferencia y existe al menos una coincidencia, prioriza solo las que coinciden
         CASE
-          WHEN w.new_company IS NOT NULL AND w.savings_yearly > 0
-            THEN w.savings_yearly + COALESCE(w.total_crs,0::real)::double precision * 4.0
-          ELSE w.savings_yearly + COALESCE(w.total_crs,0::real)::double precision * 4.0
+          WHEN rp.has_subrate_pref AND se.exists_subrate_match_for_id
+            THEN CASE WHEN rp.subrate_match THEN 1 ELSE 0 END
+          ELSE 1  -- sin preferencia o sin coincidencias: no penalizar (fallback)
+        END DESC,
+
+        -- 2) Score de negocio (ahorro + CRS)
+        CASE
+          WHEN rp.new_company IS NOT NULL AND rp.savings_yearly > 0
+            THEN rp.savings_yearly + COALESCE(rp.total_crs,0::real)::double precision * 4.0
+          ELSE rp.savings_yearly + COALESCE(rp.total_crs,0::real)::double precision * 4.0
         END DESC
     ) AS rank
-  FROM with_crs w
+  FROM rank_prep rp
+  LEFT JOIN subrate_exist se USING (id)
 ),
 
 -- ====== Supervisores y datos asesor ======
