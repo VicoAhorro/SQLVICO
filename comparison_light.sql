@@ -82,40 +82,94 @@ base AS (
     cr.rate_mode
 
   FROM comparison_light cl
-  LEFT JOIN comparison_rates cr
+ LEFT JOIN comparison_rates cr
   ON cr.type = 'light'
   AND cr.company <> cl.company
+
+  -- =========================
+  -- 🔸 Filtro principal con fallback de mes/año + subrate
+  -- =========================
   AND (
-        (cr.invoice_month IS NULL AND cr.invoice_year IS NULL)
-    OR (cr.invoice_month = cl.invoice_month AND cr.invoice_year = cl.invoice_year)
-  )
-  AND (cl.region IS NULL OR cl.region = ANY (cr.region))
-  AND (
-        cl.wants_permanence IS NOT TRUE
-        OR cr.has_permanence = TRUE
-        OR NOT EXISTS (
-            SELECT 1
-            FROM comparison_rates crp
-            WHERE crp.type = 'light'
-              AND crp.company <> cl.company
-              AND (
-                    (crp.invoice_month IS NULL AND crp.invoice_year IS NULL)
-                OR (crp.invoice_month = cl.invoice_month AND crp.invoice_year = cl.invoice_year)
-              )
-              AND (
-                    cl.preferred_subrate IS NULL
-                    OR cl.preferred_subrate = ''
-                    OR crp.subrate_name = cl.preferred_subrate
-              )
-              AND (
-                    (cl.selfconsumption = TRUE AND crp.selfconsumption = TRUE)
-                    OR (cl.selfconsumption = FALSE)
-              )
-              AND (cl.region IS NULL OR cl.region = ANY (crp.region))
-              AND crp.has_permanence = TRUE
+      -- 1️⃣ Coincidencia exacta de mes/año + subrate (normal)
+      ((cr.invoice_month = cl.invoice_month AND cr.invoice_year = cl.invoice_year)
+        AND (
+            cl.preferred_subrate IS NULL
+            OR cl.preferred_subrate = ''
+            OR LOWER(cr.subrate_name::text) = LOWER(cl.preferred_subrate::text)
         )
       )
-      AND (cr.cif IS NULL OR cr.cif = cl.cif)
+
+      -- 2️⃣ Tarifas genéricas (sin periodo definido)
+      OR (cr.invoice_month IS NULL AND cr.invoice_year IS NULL)
+
+      -- 3️⃣ Fallback: si no hay tarifas del mes/año con esa preferred_subrate → permitir todas del mes/año
+      OR (
+          (cr.invoice_month = cl.invoice_month AND cr.invoice_year = cl.invoice_year)
+          AND NOT EXISTS (
+              SELECT 1
+              FROM comparison_rates crs
+              WHERE crs.type = 'light'
+                AND crs.company <> cl.company
+                AND crs.invoice_month = cl.invoice_month
+                AND crs.invoice_year = cl.invoice_year
+                AND LOWER(crs.subrate_name::text) = LOWER(cl.preferred_subrate::text)
+          )
+      )
+
+      -- 4️⃣ Fallback: si no hay tarifas del mes exacto → permitir cualquiera del mismo año
+      OR (
+          cr.invoice_year = cl.invoice_year
+          AND NOT EXISTS (
+              SELECT 1
+              FROM comparison_rates cry
+              WHERE cry.type = 'light'
+                AND cry.company <> cl.company
+                AND cry.invoice_month = cl.invoice_month
+                AND cry.invoice_year = cl.invoice_year
+          )
+      )
+  )
+
+  -- =========================
+  -- 🔸 Otros filtros coherentes con tu vista
+  -- =========================
+  AND (cl.region IS NULL OR cl.region = ANY (cr.region))
+
+  -- ✅ Autoconsumo simétrico (solo coinciden si ambos tienen el mismo valor lógico)
+  AND (
+    (cl.selfconsumption = TRUE AND COALESCE(cr.selfconsumption, FALSE) = TRUE)
+    OR (cl.selfconsumption IS DISTINCT FROM TRUE AND cr.selfconsumption IS DISTINCT FROM TRUE)
+  )
+
+  -- ✅ CIF igual o nulo
+  AND (cr.cif IS NULL OR cr.cif = cl.cif)
+
+  -- =========================
+  -- 🔸 Fallback de permanencia coherente
+  -- =========================
+  AND (
+      cl.wants_permanence IS NOT TRUE
+      OR cr.has_permanence = TRUE
+      OR NOT EXISTS (
+          SELECT 1
+          FROM comparison_rates crp
+          WHERE crp.type = 'light'
+            AND crp.company <> cl.company
+            AND (
+                  (crp.invoice_month IS NULL AND crp.invoice_year IS NULL)
+               OR (crp.invoice_month = cl.invoice_month AND crp.invoice_year = cl.invoice_year)
+            )
+            AND (cl.region IS NULL OR cl.region = ANY (crp.region))
+            AND (
+                  (cl.selfconsumption = TRUE AND COALESCE(crp.selfconsumption, FALSE) = TRUE)
+                  OR (cl.selfconsumption IS DISTINCT FROM TRUE AND crp.selfconsumption IS DISTINCT FROM TRUE)
+                )
+            AND (crp.cif IS NULL OR crp.cif = cl.cif)
+            AND crp.has_permanence = TRUE
+      )
+  )
+
+
   ),
 -- ====== Metrizaciones mensuales y totales base ======
 m_calc AS (
