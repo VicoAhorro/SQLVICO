@@ -477,7 +477,7 @@ SELECT
       ( (
             (COALESCE(rc.anual_consumption_p1, 0) * (COALESCE(rc.price_cp1, 0))+0.00234) +
             (COALESCE(rc.price_pp1, 0) * 365)) * (1 + COALESCE(rc."VAT", 0.0))
-    )) / (rc.current_total_invoice * (365.0 / rc.days))
+    )) / NULLIF(rc.current_total_invoice * (365.0 / rc.days), 0)
 
     when rc.new_company is not null and rc.type <> '3_0'::text then 
     (
