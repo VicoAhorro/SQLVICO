@@ -82,10 +82,15 @@ base AS (
     cr.rate_mode
 
   FROM comparison_light cl
- LEFT JOIN comparison_rates cr
+  LEFT JOIN users u
+  ON u.user_id = cl.advisor_id
+  LEFT JOIN comparison_rates cr
   ON cr.type = 'light'
   AND cr.company <> cl.company
-
+  AND (cr.deleted = FALSE)
+  AND (cr.tenant_id IS NULL 
+        OR u.tenant = ANY(cr.tenant_id)
+      )
   -- =========================
   -- 🔸 Filtro principal con fallback de mes/año + subrate
   -- =========================

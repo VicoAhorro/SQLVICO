@@ -122,10 +122,15 @@ calculated_prices_gas AS (
     cg.region,
     cr.has_permanence,
     cr.rate_mode
+
   FROM comparison_gas cg
+  LEFT JOIN users u 
+  ON u.user_id = cg.advisor_id
   LEFT JOIN comparison_rates cr
   ON cr.type = 'gas'
  AND cr.company <> cg.company
+ AND (cr.deleted = FALSE)
+ AND (cr.tenant_id IS NULL OR u.tenant = ANY(cr.tenant_id))
  AND cr.subrate_name = cg.rate_name
  AND (
       (cr.invoice_month IS NULL AND cr.invoice_year IS NULL)

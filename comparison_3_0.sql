@@ -145,9 +145,13 @@ WITH calculated_prices_3_0 AS (
     c30.region
     
   FROM comparison_3_0 c30
+  LEFT JOIN users u 
+  ON u.user_id = c30.advisor_id
   LEFT JOIN comparison_rates cr
   ON cr.type = '3_0'
     AND cr.company <> c30.company
+    AND (cr.deleted = FALSE)
+    AND (cr.tenant_id IS NULL OR u.tenant = ANY(cr.tenant_id))
     -- Filtro de mes/año solo si la tarifa es indexada
     AND (
           cr.rate_mode::text <> 'indexada'
