@@ -143,6 +143,36 @@ calculated_prices_gas AS (
       OR cg.preferred_subrate = ''
       OR cr.subrate_name = cg.rate_name
  )
+ -- Filter by preferred rate type if specified, with fallback to any rate type if no matches
+ AND (
+      cg.prefered_rate_type IS NULL 
+      OR cr.rate_mode = cg.prefered_rate_type
+      OR (cg.prefered_rate_type = 'indexada' AND cr.rate_mode IS NULL)  -- Handle legacy rates without rate_mode
+      OR NOT EXISTS (
+          -- Fallback: if no rates match the preferred type, show any rate type
+          SELECT 1
+          FROM comparison_rates cr2
+          WHERE cr2.type = 'gas'
+            AND cr2.company <> cg.company
+            AND cr2.subrate_name = cg.rate_name
+            AND (cr2.deleted = FALSE)
+            AND (cr2.tenant_id IS NULL OR u.tenant = ANY(cr2.tenant_id))
+            AND (
+                 (cr2.invoice_month IS NULL AND cr2.invoice_year IS NULL)
+                 OR (cr2.invoice_month = cg.invoice_month AND cr2.invoice_year = cg.invoice_year)
+            )
+            AND (cr2.cif IS NULL OR cr2.cif = cg.cif)
+            AND (
+                 cg.preferred_subrate IS NULL
+                 OR cg.preferred_subrate = ''
+                 OR cr2.subrate_name = cg.rate_name
+            )
+            AND (
+                 cr2.rate_mode = cg.prefered_rate_type
+                 OR (cg.prefered_rate_type = 'indexada' AND cr2.rate_mode IS NULL)
+            )
+      )
+ )
  -- ⬇️ Fallback de permanencia:
  AND (
       cg.wants_permanence IS NOT TRUE                        -- el cliente no pidió permanencia → acepta cualquiera
