@@ -121,7 +121,8 @@ calculated_prices_gas AS (
     cg.cif,
     cg.region,
     cr.has_permanence,
-    cr.rate_mode
+    cr.rate_mode,
+    0                                             AS total_excedentes_precio
 
   FROM comparison_gas cg
   LEFT JOIN users u 
@@ -563,7 +564,8 @@ SELECT
     -- NUEVO: Al final del SELECT
   0.0::numeric(8,2) AS daily_maintenance_with_vat,
   rc.has_permanence,
-  rc.rate_mode
+  rc.rate_mode,
+  rc.total_excedentes_precio
 
 FROM all_comparisons_ranked rc
 LEFT JOIN _users_supervisors us ON rc.advisor_id = us.user_id

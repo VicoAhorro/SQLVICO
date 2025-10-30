@@ -126,7 +126,8 @@ ranked_phone AS (
     ROW_NUMBER() OVER (
       PARTITION BY cp.id
       ORDER BY ((cp.current_total_invoice*12)::double precision - rc_1.total_anual_price) + rc_1.total_crs*4 DESC
-    ) AS rank
+    ) AS rank,
+    0
   FROM comparison_phone cp
   JOIN recursive_combinations rc_1
     ON rc_1.fibra_mb   >= cp.speed_fiber
@@ -272,7 +273,8 @@ SELECT DISTINCT
     -- NUEVO: Al final del SELECT
   0.0::numeric(8,2) AS daily_maintenance_with_vat,
   false as has_permanence,
-  NULL::rate_mode_type AS rate_mode
+  NULL::rate_mode_type AS rate_mode,
+  0                                      AS total_excedentes_precio
   
 FROM ranked_phone rp
 LEFT JOIN _users_supervisors us ON rp.advisor_id = us.user_id
