@@ -249,6 +249,7 @@ tot AS (
       COALESCE(m.anual_consumption_p3,0::real)*COALESCE(m.price_cp3,0::real) +
       COALESCE(NULLIF(m.power_p1,0::double precision),1::real)*COALESCE(m.price_pp1,0::real)*365::double precision +
       COALESCE(m.power_p2,0::real)*COALESCE(m.price_pp2,0::real)*365::double precision
+      - COALESCE(m.surpluses,0) * 182.5::double precision / NULLIF(m.power_days::double precision,0) * COALESCE(m.price_surpluses,0::real)
     ) * (1 + 0.05113::double precision) * (1 + COALESCE(m."VAT",0::real))) 
     + (COALESCE(m.daily_maintenance_with_vat, 0) * 365) AS new_total_yearly_price_with_vat,
 
