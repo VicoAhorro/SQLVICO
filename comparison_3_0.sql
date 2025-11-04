@@ -76,6 +76,7 @@ WITH calculated_prices_3_0 AS (
     cr.price_surpluses,
     cr.has_permanence,
     cr.rate_mode,
+    0::real as total_excedentes_precio,
 
 -- ================================================================================
 -- TOTAL POWER PRICE
@@ -525,7 +526,8 @@ SELECT DISTINCT
 
   0.0::numeric(8,2) AS daily_maintenance_with_vat,
   rc.has_permanence,
-  rc.rate_mode
+  rc.rate_mode,
+  rc.total_excedentes_precio 
 
 FROM all_comparisons_ranked rc
 LEFT JOIN _users_supervisors us ON rc.advisor_id = us.user_id

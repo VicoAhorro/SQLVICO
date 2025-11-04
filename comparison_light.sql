@@ -79,7 +79,8 @@ base AS (
     cr.has_maintenance,
     cr.daily_maintenance_with_vat,
     cr.has_permanence,
-    cr.rate_mode
+    cr.rate_mode,
+    cl.total_excedentes_precio
 
   FROM comparison_light cl
   LEFT JOIN users u
@@ -561,7 +562,8 @@ SELECT DISTINCT
   rc.region,
   rc.daily_maintenance_with_vat::numeric(8,2),
   rc.has_permanence,
-  rc.rate_mode
+  rc.rate_mode,
+  rc.total_excedentes_precio
 
 FROM with_advisor rc
 LEFT JOIN users u ON u.user_id = rc.advisor_id
