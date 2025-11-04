@@ -147,7 +147,7 @@ calculated_prices_gas AS (
  AND (
       cg.prefered_rate_type IS NULL 
       OR cr.rate_mode = cg.prefered_rate_type
-      OR (cg.prefered_rate_type = 'indexada' AND cr.rate_mode IS NULL)  -- Handle legacy rates without rate_mode
+      OR (cg.prefered_rate_type = 'Indexada' AND cr.rate_mode IS NULL)  -- Handle legacy rates without rate_mode
       OR NOT EXISTS (
           -- Fallback: if no rates match the preferred type, show any rate type
           SELECT 1
@@ -169,7 +169,7 @@ calculated_prices_gas AS (
             )
             AND (
                  cr2.rate_mode = cg.prefered_rate_type
-                 OR (cg.prefered_rate_type = 'indexada' AND cr2.rate_mode IS NULL)
+                 OR (cg.prefered_rate_type = 'Indexada' AND cr2.rate_mode IS NULL)
             )
       )
  )
