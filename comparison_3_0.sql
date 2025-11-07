@@ -155,7 +155,7 @@ WITH calculated_prices_3_0 AS (
     AND (cr.tenant_id IS NULL OR u.tenant = ANY(cr.tenant_id))
     -- Filtro de mes/año solo si la tarifa es indexada
     AND (
-          cr.rate_mode::text <> 'indexada'
+          cr.rate_mode::text <> 'Indexada'
           OR (
               (cr.invoice_month IS NULL AND cr.invoice_year IS NULL)
             OR (cr.invoice_month = c30.invoice_month AND cr.invoice_year = c30.invoice_year)
@@ -177,7 +177,7 @@ WITH calculated_prices_3_0 AS (
            WHERE crp.type = '3_0'
              AND crp.company <> c30.company
              AND (
-                  crp.rate_mode::text <> 'indexada'
+                  crp.rate_mode::text <> 'Indexada'
                   OR (
                        (crp.invoice_month IS NULL AND crp.invoice_year IS NULL)
                     OR (crp.invoice_month = c30.invoice_month AND crp.invoice_year = c30.invoice_year)
