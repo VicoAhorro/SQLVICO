@@ -66,6 +66,7 @@ WITH calculated_prices_3_0 AS (
     c30.invoice_year,
     0::real AS meter_rental,
     c30.preferred_subrate,
+    c30.rate_i_have,
 
     cr.company      AS new_company,
     cr.rate_name    AS new_rate_name,
@@ -527,7 +528,8 @@ SELECT DISTINCT
   0.0::numeric(8,2) AS daily_maintenance_with_vat,
   rc.has_permanence,
   rc.rate_mode,
-  rc.total_excedentes_precio 
+  rc.total_excedentes_precio,
+  rc.rate_i_have
 
 FROM all_comparisons_ranked rc
 LEFT JOIN _users_supervisors us ON rc.advisor_id = us.user_id

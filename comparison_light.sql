@@ -563,7 +563,8 @@ SELECT DISTINCT
   rc.daily_maintenance_with_vat::numeric(8,2),
   rc.has_permanence,
   rc.rate_mode,
-  rc.total_excedentes_precio
+  rc.total_excedentes_precio,
+  null::rate_mode_type AS rate_i_have
 
 FROM with_advisor rc
 LEFT JOIN users u ON u.user_id = rc.advisor_id
