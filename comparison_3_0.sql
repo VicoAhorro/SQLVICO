@@ -147,7 +147,7 @@ WITH calculated_prices_3_0 AS (
     c30.region
     
   FROM comparison_3_0 c30
-  LEFT JOIN users u 
+  LEFT JOIN users u
   ON u.user_id = c30.advisor_id
   LEFT JOIN comparison_rates cr
   ON cr.type = '3_0'
@@ -170,30 +170,41 @@ WITH calculated_prices_3_0 AS (
     )
   -- ⬇️ Fallback de permanencia (igual que en GAS):
  AND (
-      c30.wants_permanence IS NOT TRUE        -- no pidió permanencia → acepta cualquiera
-      OR cr.has_permanence = TRUE             -- la pidió y esta tarifa la tiene
-      OR NOT EXISTS (                         -- la pidió pero NO hay ninguna con permanencia → ignora la condición
-           SELECT 1
-           FROM comparison_rates crp
-           WHERE crp.type = '3_0'
-             AND crp.company <> c30.company
-             AND (
-                  crp.rate_mode::text <> 'Indexada'
-                  OR (
-                       (crp.invoice_month IS NULL AND crp.invoice_year IS NULL)
-                    OR (crp.invoice_month = c30.invoice_month AND crp.invoice_year = c30.invoice_year)
-                  )
-             )
-             AND (
-                  c30.preferred_subrate IS NULL
-                  OR c30.preferred_subrate = ''
-                  OR crp.subrate_name = c30.preferred_subrate
-             )
-             AND (c30.region IS NULL OR c30.region = ANY (crp.region))
-             AND crp.has_permanence = TRUE
+      -- Si NO quiere permanencia → rechazar tarifas con permanencia
+      (c30.wants_permanence IS NOT TRUE AND COALESCE(cr.has_permanence, FALSE) = FALSE)
+      -- Si SÍ quiere permanencia → aceptar solo con permanencia (o todas si no existe ninguna)
+      OR (
+           c30.wants_permanence = TRUE
+           AND (
+                cr.has_permanence = TRUE
+                OR NOT EXISTS (
+                     SELECT 1
+                     FROM comparison_rates crp
+                     WHERE crp.type = '3_0'
+                       AND crp.company <> c30.company
+                       AND (
+                            crp.rate_mode::text <> 'Indexada'
+                            OR (
+                                 (crp.invoice_month IS NULL AND crp.invoice_year IS NULL)
+                              OR (crp.invoice_month = c30.invoice_month AND crp.invoice_year = c30.invoice_year)
+                            )
+                       )
+                       AND (
+                            c30.preferred_subrate IS NULL
+                            OR c30.preferred_subrate = ''
+                            OR crp.subrate_name = c30.preferred_subrate
+                       )
+                       AND (c30.region IS NULL OR c30.region = ANY (crp.region))
+                       AND crp.has_permanence = TRUE
+                )
+           )
       )
  )
- AND (cr.cif IS NULL OR cr.cif = c30.cif)
+ AND (
+      cr.cif IS NULL
+      OR c30.cif IS NULL
+      OR cr.cif = c30.cif
+ )
   WHERE (c30.deleted IS NULL OR c30.deleted = FALSE)
     AND (c30.region IS NULL OR c30.region = ANY (cr.region))
 ),
