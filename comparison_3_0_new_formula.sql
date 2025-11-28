@@ -1,6 +1,6 @@
--- DROP VIEW IF EXISTS public._comparisons_detailed_3_0;
+DROP VIEW IF EXISTS public._comparisons_detailed_3_0_new_formula;
 
--- CREATE OR REPLACE VIEW public._comparisons_detailed_3_0 AS
+CREATE OR REPLACE VIEW public._comparisons_detailed_3_0_new_formula AS
 WITH calculated_prices_3_0 AS (
   SELECT
     c30.id,
@@ -66,6 +66,7 @@ WITH calculated_prices_3_0 AS (
     c30.invoice_year,
     0::real AS meter_rental,
     c30.preferred_subrate,
+    c30.rate_i_have,
 
     cr.company      AS new_company,
     cr.rate_name    AS new_rate_name,
@@ -148,10 +149,52 @@ WITH calculated_prices_3_0 AS (
   FROM comparison_3_0 c30
   LEFT JOIN users u 
   ON u.user_id = c30.advisor_id
-  LEFT JOIN comparison_rates cr
-  ON cr.type = '3_0'
-    AND cr.company <> c30.company
-    AND (cr.deleted = FALSE)
+  LEFT JOIN LATERAL (
+    SELECT cr.*
+    FROM comparison_rates cr
+    WHERE cr.type = '3_0'
+      AND cr.company <> c30.company
+      AND (cr.deleted = FALSE)
+      AND (cr.tenant_id IS NULL OR u.tenant = ANY (cr.tenant_id))
+      AND (
+        cr.rate_mode::text <> 'Indexada'
+        OR (
+          (cr.invoice_month IS NULL AND cr.invoice_year IS NULL)
+          OR (cr.invoice_month = c30.invoice_month AND cr.invoice_year = c30.invoice_year)
+        )
+      )
+      AND (
+        c30.preferred_subrate IS NULL
+        OR c30.preferred_subrate = ''
+        OR cr.subrate_name = c30.preferred_subrate
+      )
+      AND (
+        c30.wants_permanence IS NOT TRUE
+        OR cr.has_permanence = TRUE
+        OR NOT EXISTS (
+          SELECT 1
+          FROM comparison_rates crp
+          WHERE crp.type = '3_0'
+            AND crp.company <> c30.company
+            AND (
+              crp.rate_mode::text <> 'Indexada'
+              OR (
+                (crp.invoice_month IS NULL AND crp.invoice_year IS NULL)
+                OR (crp.invoice_month = c30.invoice_month AND crp.invoice_year = c30.invoice_year)
+              )
+            )
+            AND (
+              c30.preferred_subrate IS NULL
+              OR c30.preferred_subrate = ''
+              OR crp.subrate_name = c30.preferred_subrate
+            )
+            AND (c30.region IS NULL OR c30.region = ANY (crp.region))
+            AND crp.has_permanence = TRUE
+        )
+      )
+      AND (cr.cif IS NULL OR cr.cif = c30.cif)
+      AND (c30.region IS NULL OR c30.region = ANY (cr.region))
+  ) cr ON TRUE
   WHERE (c30.deleted IS NULL OR c30.deleted = FALSE)
 ),
 unified_calculated_prices AS (
@@ -181,7 +224,7 @@ unified_extended_prices AS (
       WHEN ucp.new_company IS NOT NULL THEN
         CASE
           -- Indexada vs Indexada
-          WHEN ucp.rate_mode = 'Indexada' AND c30_base.rate_i_want = 'Indexada' THEN
+          WHEN c30_base.rate_i_have = 'Indexada' AND ucp.rate_mode = 'Indexada' THEN
             (
                 (
                   (COALESCE(ucp.anual_consumption_p1,0::real)*COALESCE(ucp."precio_kwh_P1",0::real) +
@@ -212,7 +255,7 @@ unified_extended_prices AS (
                 ) * 1.05113 * (1 + COALESCE(ucp."VAT",0))
             )
           -- Fija vs Fija
-          WHEN ucp.rate_mode = 'Fija' AND c30_base.rate_i_want = 'Fija' THEN
+          WHEN c30_base.rate_i_have = 'Fija' AND ucp.rate_mode = 'Fija' THEN
             (
               (
                   (COALESCE(ucp.anual_consumption_p1,0::real)*COALESCE(ucp."precio_kwh_P1",0::real) +
@@ -247,8 +290,8 @@ unified_extended_prices AS (
                   COALESCE(ucp.power_p6,0::real)*COALESCE(ucp.price_pp6,0::real)*365.0
                 ) * 1.05113 * (1 + COALESCE(ucp."VAT",0))
             )
-          -- Indexada vs Fija (cliente quiere Fija, comparamos con Indexada)
-          WHEN ucp.rate_mode = 'Indexada' AND c30_base.rate_i_want = 'Fija' THEN
+          -- Indexada vs Fija
+          WHEN c30_base.rate_i_have = 'Indexada' AND ucp.rate_mode = 'Fija' THEN
             (
               (
                   (COALESCE(ucp.anual_consumption_p1,0::real)*COALESCE(ucp."precio_kwh_P1",0::real) +
@@ -283,8 +326,8 @@ unified_extended_prices AS (
                   COALESCE(ucp.power_p6,0::real)*COALESCE(ucp.price_pp6,0::real)*365.0
                 ) * 1.05113 * (1 + COALESCE(ucp."VAT",0))
             )
-          -- Fija vs Indexada (cliente quiere Indexada, comparamos con Fija)
-          WHEN ucp.rate_mode = 'Fija' AND c30_base.rate_i_want = 'Indexada' THEN
+          -- Fija vs Indexada
+          WHEN c30_base.rate_i_have = 'Fija' AND ucp.rate_mode = 'Indexada' THEN
             (
               (
                   (COALESCE(ucp.anual_consumption_p1,0::real)*COALESCE(ucp."precio_kwh_P1",0::real) +
@@ -349,75 +392,6 @@ filtered_prices AS (
   FROM unified_extended_prices uep
   LEFT JOIN comparison_3_0 c30 ON c30.id = uep.id
   LEFT JOIN users u ON u.user_id = c30.advisor_id
-  WHERE
-    -- Filtro de tenant
-    (uep.new_rate_id IS NULL OR EXISTS (
-      SELECT 1 FROM comparison_rates cr
-      WHERE cr.id = uep.new_rate_id
-        AND (cr.tenant_id IS NULL OR u.tenant = ANY(cr.tenant_id))
-    ))
-    -- Filtro de mes/año solo si la tarifa es indexada
-    AND (uep.new_rate_id IS NULL OR EXISTS (
-      SELECT 1 FROM comparison_rates cr
-      WHERE cr.id = uep.new_rate_id
-        AND (
-          cr.rate_mode::text <> 'Indexada'
-          OR (
-            (cr.invoice_month IS NULL AND cr.invoice_year IS NULL)
-            OR (cr.invoice_month = c30.invoice_month AND cr.invoice_year = c30.invoice_year)
-          )
-        )
-    ))
-    -- Subrate preferida (si hay)
-    AND (uep.new_rate_id IS NULL OR EXISTS (
-      SELECT 1 FROM comparison_rates cr
-      WHERE cr.id = uep.new_rate_id
-        AND (
-          c30.preferred_subrate IS NULL
-          OR c30.preferred_subrate = ''
-          OR cr.subrate_name = c30.preferred_subrate
-        )
-    ))
-    -- Fallback de permanencia
-    AND (uep.new_rate_id IS NULL OR
-      c30.wants_permanence IS NOT TRUE
-      OR EXISTS (
-        SELECT 1 FROM comparison_rates cr
-        WHERE cr.id = uep.new_rate_id AND cr.has_permanence = TRUE
-      )
-      OR NOT EXISTS (
-        SELECT 1
-        FROM comparison_rates crp
-        WHERE crp.type = '3_0'
-          AND crp.company <> c30.company
-          AND (
-            crp.rate_mode::text <> 'Indexada'
-            OR (
-              (crp.invoice_month IS NULL AND crp.invoice_year IS NULL)
-              OR (crp.invoice_month = c30.invoice_month AND crp.invoice_year = c30.invoice_year)
-            )
-          )
-          AND (
-            c30.preferred_subrate IS NULL
-            OR c30.preferred_subrate = ''
-            OR crp.subrate_name = c30.preferred_subrate
-          )
-          AND (c30.region IS NULL OR c30.region = ANY (crp.region))
-          AND crp.has_permanence = TRUE
-      )
-    )
-    -- Filtro de CIF
-    AND (uep.new_rate_id IS NULL OR EXISTS (
-      SELECT 1 FROM comparison_rates cr
-      WHERE cr.id = uep.new_rate_id
-        AND (cr.cif IS NULL OR cr.cif = c30.cif)
-    ))
-    -- Filtro de región
-    AND (c30.region IS NULL OR uep.new_rate_id IS NULL OR EXISTS (
-      SELECT 1 FROM comparison_rates cr
-      WHERE cr.id = uep.new_rate_id
-        AND c30.region = ANY (cr.region)
-    ))
 ),
 ranked_comparisons AS (
   SELECT
@@ -427,6 +401,15 @@ ranked_comparisons AS (
         THEN fp.savings_yearly + COALESCE(fp.total_crs,0::real) * 4
       ELSE fp.savings_yearly + COALESCE(fp.total_crs,0::real) * 4
     END AS ranked_crs,
+    ROW_NUMBER() OVER (
+      PARTITION BY fp.id, fp.rate_mode
+      ORDER BY
+        CASE
+          WHEN fp.new_company IS NOT NULL AND fp.savings_yearly > 0
+            THEN fp.savings_yearly + COALESCE(fp.total_crs,0::real) * 4
+          ELSE fp.savings_yearly + COALESCE(fp.total_crs,0::real) * 4
+        END DESC
+    ) AS rank_by_mode,
     ROW_NUMBER() OVER (
       PARTITION BY fp.id
       ORDER BY
@@ -679,11 +662,16 @@ SELECT DISTINCT
 
   0.0::numeric(8,2) AS daily_maintenance_with_vat,
   rc.has_permanence,
+  rc.rate_i_have,
   rc.rate_mode,
   rc.total_excedentes_precio 
 
 FROM all_comparisons_ranked rc
 LEFT JOIN _users_supervisors us ON rc.advisor_id = us.user_id
 LEFT JOIN users u               ON u.user_id     = rc.advisor_id
-WHERE rc.rank = 1
-  AND (rc.deleted IS NULL OR rc.deleted = FALSE);
+WHERE (rc.deleted IS NULL OR rc.deleted = FALSE)
+  AND (
+    (rc.rate_i_want IS NULL AND rc.rank = 1)
+    OR (rc.rate_i_want = 'Fija' AND rc.rate_mode = 'Fija' AND rc.rank_by_mode = 1)
+    OR (rc.rate_i_want = 'Indexada' AND rc.rate_mode = 'Indexada' AND rc.rank_by_mode = 1)
+  );

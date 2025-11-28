@@ -100,9 +100,11 @@ WITH calculated_prices_3_0 AS (
           OR cr.subrate_name = c30.preferred_subrate
     )
     AND (
-      -- Si NO quiere permanencia → rechazar tarifas con permanencia
-      (c30.wants_permanence IS NOT TRUE AND COALESCE(cr.has_permanence, FALSE) = FALSE)
-      -- Si SÍ quiere permanencia → aceptar solo con permanencia (o todas si no existe ninguna)
+      -- Si wants_permanence es NULL → acepta cualquier tarifa (con o sin permanencia)
+      c30.wants_permanence IS NULL
+      -- Si NO quiere permanencia (FALSE) → rechazar tarifas con permanencia
+      OR (c30.wants_permanence = FALSE AND COALESCE(cr.has_permanence, FALSE) = FALSE)
+      -- Si SÍ quiere permanencia (TRUE) → aceptar solo con permanencia (o todas si no existe ninguna)
       OR (
            c30.wants_permanence = TRUE
            AND (
