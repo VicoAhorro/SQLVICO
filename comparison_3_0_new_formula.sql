@@ -153,47 +153,59 @@ WITH calculated_prices_3_0 AS (
     SELECT cr.*
     FROM comparison_rates cr
     WHERE cr.type = '3_0'
-      AND cr.company <> c30.company
-      AND (cr.deleted = FALSE)
-      AND (cr.tenant_id IS NULL OR u.tenant = ANY (cr.tenant_id))
       AND (
-        cr.rate_mode::text <> 'Indexada'
+        -- Caso forzado: si el cliente viene de Fija y la tarifa es Indexada, solo se usa esta rate concreta (sin más filtros)
+        (
+          c30.rate_i_have = 'Fija'
+          AND c30.rate_i_want = 'Indexada'
+          AND cr.id = 'febdbb18-8de5-4f2c-982a-ddfe2e18b3c8'
+        )
+        -- Resto de casos: aplican los filtros habituales
         OR (
-          (cr.invoice_month IS NULL AND cr.invoice_year IS NULL)
-          OR (cr.invoice_month = c30.invoice_month AND cr.invoice_year = c30.invoice_year)
+          (c30.rate_i_have IS DISTINCT FROM 'Fija' OR cr.rate_mode IS DISTINCT FROM 'Indexada')
+          AND cr.company <> c30.company
+          AND (cr.deleted = FALSE)
+          AND (cr.tenant_id IS NULL OR u.tenant = ANY (cr.tenant_id))
+          AND (
+            cr.rate_mode::text <> 'Indexada'
+            OR (
+              (cr.invoice_month IS NULL AND cr.invoice_year IS NULL)
+              OR (cr.invoice_month = c30.invoice_month AND cr.invoice_year = c30.invoice_year)
+            )
+          )
+          AND (
+            c30.preferred_subrate IS NULL
+            OR c30.preferred_subrate = ''
+            OR cr.subrate_name = c30.preferred_subrate
+          )
+          AND (
+            c30.wants_permanence IS NOT TRUE
+            OR cr.has_permanence = TRUE
+            OR NOT EXISTS (
+              SELECT 1
+              FROM comparison_rates crp
+              WHERE crp.type = '3_0'
+                AND crp.company <> c30.company
+                AND (
+                  crp.rate_mode::text <> 'Indexada'
+                  OR (
+                    (crp.invoice_month IS NULL AND crp.invoice_year IS NULL)
+                    OR (crp.invoice_month = c30.invoice_month AND crp.invoice_year = c30.invoice_year)
+                  )
+                )
+                AND (
+                  c30.preferred_subrate IS NULL
+                  OR c30.preferred_subrate = ''
+                  OR crp.subrate_name = c30.preferred_subrate
+                )
+                AND (c30.region IS NULL OR c30.region = ANY (crp.region))
+                AND crp.has_permanence = TRUE
+            )
+          )
+          AND (cr.cif IS NULL OR cr.cif = c30.cif)
+          AND (c30.region IS NULL OR c30.region = ANY (cr.region))
         )
       )
-      AND (
-        c30.preferred_subrate IS NULL
-        OR c30.preferred_subrate = ''
-        OR cr.subrate_name = c30.preferred_subrate
-      )
-      AND (
-        c30.wants_permanence IS NOT TRUE
-        OR cr.has_permanence = TRUE
-        OR NOT EXISTS (
-          SELECT 1
-          FROM comparison_rates crp
-          WHERE crp.type = '3_0'
-            AND crp.company <> c30.company
-            AND (
-              crp.rate_mode::text <> 'Indexada'
-              OR (
-                (crp.invoice_month IS NULL AND crp.invoice_year IS NULL)
-                OR (crp.invoice_month = c30.invoice_month AND crp.invoice_year = c30.invoice_year)
-              )
-            )
-            AND (
-              c30.preferred_subrate IS NULL
-              OR c30.preferred_subrate = ''
-              OR crp.subrate_name = c30.preferred_subrate
-            )
-            AND (c30.region IS NULL OR c30.region = ANY (crp.region))
-            AND crp.has_permanence = TRUE
-        )
-      )
-      AND (cr.cif IS NULL OR cr.cif = c30.cif)
-      AND (c30.region IS NULL OR c30.region = ANY (cr.region))
   ) cr ON TRUE
   WHERE (c30.deleted IS NULL OR c30.deleted = FALSE)
 ),

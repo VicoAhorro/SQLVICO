@@ -549,8 +549,9 @@ SELECT DISTINCT
   -- Derivados de fecha, búsqueda y filtros
   EXTRACT(MONTH FROM rc.created_at)::text AS created_month,
   EXTRACT(YEAR  FROM rc.created_at)::text AS created_year,
+  COALESCE(rc."CUPS",'') || ' ' ||
   LOWER(
-    COALESCE(rc."CUPS",'') || ' ' ||
+    COALESCE(u.email,'') || ' ' ||
     COALESCE(rc.client_email,'') || ' ' ||
     COALESCE(rc.company,'') || ' ' ||
     COALESCE(rc.rate_name,'') || ' ' ||
