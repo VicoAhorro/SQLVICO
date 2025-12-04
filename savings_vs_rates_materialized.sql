@@ -1,5 +1,21 @@
-drop view public._contracts_savings_vs_rates;
-create or replace view public._contracts_savings_vs_rates as
+-- Primero creamos índices para mejorar el rendimiento
+CREATE INDEX IF NOT EXISTS idx_clients_contracts_lookup
+  ON clients_contracts(id, contract_type, deleted)
+  WHERE deleted = false;
+
+CREATE INDEX IF NOT EXISTS idx_comparison_rates_lookup
+  ON comparison_rates_v2(type, company);
+
+CREATE INDEX IF NOT EXISTS idx_comparison_rates_crs_lookup
+  ON comparison_rates_crs_duplicate(comparison_rate_id, min_kw_anual, max_kw_anual, min_power, max_power);
+
+CREATE INDEX IF NOT EXISTS idx_payment_control_contract
+  ON payment_control(contract_id);
+
+-- Ahora creamos la vista materializada
+DROP MATERIALIZED VIEW IF EXISTS public.contracts_savings_vs_rates CASCADE;
+
+CREATE MATERIALIZED VIEW public.contracts_savings_vs_rates AS
 with
   pagos as (
     select
@@ -50,13 +66,6 @@ with
       and (
         c.contract_type = any (array['light'::text, 'gas'::text, '3_0'::text])
       )
-      -- Filtro temprano: solo contratos activos con datos mínimos
-      and c.crs > 0
-      and (
-        COALESCE(c.consumoanualp1, 0) + COALESCE(c.consumoanualp2, 0) +
-        COALESCE(c.consumoanualp3, 0) + COALESCE(c.consumoanualp4, 0) +
-        COALESCE(c.consumoanualp5, 0) + COALESCE(c.consumoanualp6, 0)
-      ) > 0
   ),
   decomision_calc as (
     select
@@ -102,10 +111,10 @@ with
       -- Decomisión hoy: lo que SE DEBE DEVOLVER si el cliente se va ahora
       round((co.crs_base *
         case
-          -- ENDESA: 100% primeros 3 meses, luego 0%
+          -- ENDESA: 100% primeros 2 meses, luego 0%
           when co.current_company = 'ENDESA' and co.activation_date is not null then
             case
-              when (current_date - co.activation_date) <= 90 then 1.0
+              when (current_date - co.activation_date) <= 60 then 1.0
               else 0.0
             end
 
@@ -136,12 +145,11 @@ with
           else 1.0
         end)::numeric, 2) as decomision_hoy,
       -- Decomisión pendiente: lo que PERDERÍAS si cambias al cliente ahora
-      -- = Lo que cobré (crs_base, anticipado) - Lo que debo devolver (decomision_hoy)
       round((co.crs_base - (co.crs_base *
         case
           when co.current_company = 'ENDESA' and co.activation_date is not null then
             case
-              when (current_date - co.activation_date) <= 90 then 1.0
+              when (current_date - co.activation_date) <= 60 then 1.0
               else 0.0
             end
 
@@ -253,10 +261,6 @@ with
         cc_1.region is null
         or (cc_1.region = any (cr.region))
       )
-      -- Filtro crítico: no comparar con la misma compañía
-      and cr.company != co.current_company
-      -- Solo tarifas activas
-      and COALESCE(cr.deleted, false) = false
   ),
   candidates_with_crs as (
     select
@@ -377,15 +381,12 @@ select
   dc.total_cobrado,
   dc.decomision_hoy,
   dc.decomision_pendiente,
-  -- Diferencia entre nuevo CRS y decomisión pendiente (lo que ganamos neto)
   round((br.new_crs - dc.decomision_pendiente)::numeric, 2) as ganancia_neta_crs,
-  -- Calculo de rentabilidad: meses necesarios para recuperar la decomisión
   case
     when br.new_savings_yearly > 0 then
       round((dc.decomision_pendiente / (br.new_savings_yearly / 12.0))::numeric, 1)
     else null
   end as meses_recuperacion_decomision,
-  -- Recomendación: ¿Vale la pena cambiar?
   case
     when dc.decomision_pendiente <= 0 then 'SI - No hay decomisión pendiente'
     when br.new_crs <= dc.decomision_pendiente then 'NO - El nuevo CRS no cubre la decomisión'
@@ -394,9 +395,7 @@ select
     when (dc.decomision_pendiente / (br.new_savings_yearly / 12.0)) <= 24 then 'QUIZAS - Se recupera entre 12 y 24 meses'
     else 'NO - Tarda más de 24 meses en recuperarse'
   end as recomendacion_cambio,
-  -- Ahorro neto en 12 meses considerando decomisión
   round((br.new_savings_yearly - dc.decomision_pendiente)::numeric, 2) as ahorro_neto_primer_año,
-  -- Ahorro neto en 24 meses
   round((br.new_savings_yearly * 2 - dc.decomision_pendiente)::numeric, 2) as ahorro_neto_24_meses
 from
   contracts_costs cc
@@ -407,16 +406,12 @@ where
   (
     br.new_saving_percentage - cc.saving_percentage_actual
   ) > 0.05
-  -- CRITERIO PRINCIPAL: El nuevo CRS debe ser mayor que la decomisión pendiente
-  and br.new_crs > dc.decomision_pendiente
-  -- Filtro adicional: ahorro mínimo para que valga la pena
-  and br.new_savings_yearly > 100
-  -- Solo recomendar SI o QUIZAS (excluir NO directamente)
-  and (
-    dc.decomision_pendiente <= 0
-    or br.new_crs > dc.decomision_pendiente
-  )
-  and (
-    dc.decomision_pendiente <= 0
-    or br.new_savings_yearly > 0
-  );
+  and br.new_crs > dc.decomision_pendiente;
+
+-- Crear índice en la vista materializada
+CREATE INDEX idx_mat_savings_contract ON public.contracts_savings_vs_rates(contract_id);
+CREATE INDEX idx_mat_savings_company ON public.contracts_savings_vs_rates(new_company);
+CREATE INDEX idx_mat_savings_recomendacion ON public.contracts_savings_vs_rates(recomendacion_cambio);
+
+-- Script para refrescar la vista (ejecutar periódicamente, por ejemplo cada noche)
+-- REFRESH MATERIALIZED VIEW CONCURRENTLY public.contracts_savings_vs_rates;

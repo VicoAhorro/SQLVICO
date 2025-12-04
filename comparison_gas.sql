@@ -197,6 +197,8 @@ calculated_prices_gas AS (
       )
  )
  AND (cg.region IS NULL OR cg.region = ANY (cr.region))
+
+ where cg.valuation_id is null
 ),
 unified_calculated_prices AS (
   SELECT * FROM calculated_prices_gas

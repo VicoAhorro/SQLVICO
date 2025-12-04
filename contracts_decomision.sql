@@ -19,9 +19,38 @@ contratos as (
 calc as (
   select *,
     case
+      -- ENDESA: 100% durante los primeros 2 meses, luego 0%
+      when new_company = 'ENDESA' and activation_date is not null then
+        case
+          when (current_date - activation_date) <= 60 then 1.0
+          else 0.0
+        end
+
+      -- NATURGY: 0-2 meses: 100%, 2-4 meses: 50%, >4 meses: 0%
+      when new_company = 'NATURGY' and activation_date is not null then
+        case
+          when (current_date - activation_date) <= 60 then 1.0
+          when (current_date - activation_date) <= 120 then 0.50
+          else 0.0
+        end
+
+      -- GANA: Escalonado por trimestres
+      -- 0-3 meses: 100%, 3-6: 75%, 6-9: 50%, 9-12: 25%, >12: 0%
+      when new_company = 'GANA' and activation_date is not null then
+        case
+          when (current_date - activation_date) <= 90 then 1.0
+          when (current_date - activation_date) <= 180 then 0.75
+          when (current_date - activation_date) <= 270 then 0.50
+          when (current_date - activation_date) <= 365 then 0.25
+          else 0.0
+        end
+
+      -- BASSOLS, IMAGINA, LOGOS, PLENITUDE, CYE, GALP, ELEIA: Prorrateado lineal
       when new_company in ('BASSOLS','IMAGINA','LOGOS','PLENITUDE','CYE','GALP','ELEIA')
            and activation_date is not null
         then least(greatest((current_date - activation_date) / 365.0, 0), 1.0)
+
+      -- Resto de empresas: 100% siempre
       else 1.0
     end as porcentaje
   from contratos
