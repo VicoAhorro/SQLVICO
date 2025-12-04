@@ -174,8 +174,8 @@ base AS (
             AND crp.has_permanence = TRUE
       )
   )
-
-
+  WHERE cl.valuation_id is null
+  AND cl.deleted = false
   ),
 -- ====== Metrizaciones mensuales y totales base ======
 m_calc AS (

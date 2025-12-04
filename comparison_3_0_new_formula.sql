@@ -604,52 +604,28 @@ SELECT DISTINCT
   ) * (1::double precision + COALESCE(rc."VAT",0::real)) AS new_total_yearly_price_with_vat,
 
   -- saving_percentage
-  (
-    (
-      (
-        COALESCE(rc.anual_consumption_p1,0::real)*COALESCE(rc."precio_kwh_P1",0::real) +
-        COALESCE(rc.anual_consumption_p2,0::real)*COALESCE(rc."precio_kwh_P2",0::real) +
-        COALESCE(rc.anual_consumption_p3,0::real)*COALESCE(rc."precio_kwh_P3",0::real) +
-        COALESCE(rc.anual_consumption_p4,0::real)*COALESCE(rc."precio_kwh_P4",0::real) +
-        COALESCE(rc.anual_consumption_p5,0::real)*COALESCE(rc."precio_kwh_P5",0::real) +
-        COALESCE(rc.anual_consumption_p6,0::real)*COALESCE(rc."precio_kwh_P6",0::real) +
-        COALESCE(NULLIF(rc.power_p1,0::double precision),1::real)*COALESCE(rc."precio_kw_P1",0::real)*365.0 +
-        COALESCE(rc.power_p2,0::real)*COALESCE(rc."precio_kw_P2",0::real)*365.0 +
-        COALESCE(rc.power_p3,0::real)*COALESCE(rc."precio_kw_P3",0::real)*365.0 +
-        COALESCE(rc.power_p4,0::real)*COALESCE(rc."precio_kw_P4",0::real)*365.0 +
-        COALESCE(rc.power_p5,0::real)*COALESCE(rc."precio_kw_P5",0::real)*365.0 +
-        COALESCE(rc.power_p6,0::real)*COALESCE(rc."precio_kw_P6",0::real)*365.0
-        - COALESCE(rc.surpluses,0) * (182.5::double precision / NULLIF(rc.days::numeric,0)) * COALESCE(rc.autoconsumo_precio,0)
-      ) * 1.05113 * (1 + COALESCE(rc."VAT",0))
-      -
-      (
-        COALESCE(rc.total_consumption_price,0::real) / NULLIF(rc.total_consumption,0::real) * COALESCE(rc.total_anual_consumption,0::real) +
-        COALESCE(rc.power_p1,0::real)*COALESCE(rc.price_pp1,0::real)*365.0 +
-        COALESCE(rc.power_p2,0::real)*COALESCE(rc.price_pp2,0::real)*365.0 +
-        COALESCE(rc.power_p3,0::real)*COALESCE(rc.price_pp3,0::real)*365.0 +
-        COALESCE(rc.power_p4,0::real)*COALESCE(rc.price_pp4,0::real)*365.0 +
-        COALESCE(rc.power_p5,0::real)*COALESCE(rc.price_pp5,0::real)*365.0 +
-        COALESCE(rc.power_p6,0)*COALESCE(rc.price_pp6,0)*365.0
-      ) * 1.05113 * (1 + COALESCE(rc."VAT",0))
-    ) / NULLIF(
-      (
-        COALESCE(rc.anual_consumption_p1,0::real)*COALESCE(rc."precio_kwh_P1",0::real) +
-        COALESCE(rc.anual_consumption_p2,0::real)*COALESCE(rc."precio_kwh_P2",0::real) +
-        COALESCE(rc.anual_consumption_p3,0::real)*COALESCE(rc."precio_kwh_P3",0::real) +
-        COALESCE(rc.anual_consumption_p4,0::real)*COALESCE(rc."precio_kwh_P4",0::real) +
-        COALESCE(rc.anual_consumption_p5,0::real)*COALESCE(rc."precio_kwh_P5",0::real) +
-        COALESCE(rc.anual_consumption_p6,0::real)*COALESCE(rc."precio_kwh_P6",0::real) +
-        COALESCE(NULLIF(rc.power_p1,0::double precision),1::real)*COALESCE(rc."precio_kw_P1",0::real)*365.0 +
-        COALESCE(rc.power_p2,0::real)*COALESCE(rc."precio_kw_P2",0::real)*365.0 +
-        COALESCE(rc.power_p3,0::real)*COALESCE(rc."precio_kw_P3",0::real)*365.0 +
-        COALESCE(rc.power_p4,0::real)*COALESCE(rc."precio_kw_P4",0::real)*365.0 +
-        COALESCE(rc.power_p5,0::real)*COALESCE(rc."precio_kw_P5",0::real)*365.0 +
-        COALESCE(rc.power_p6,0::real)*COALESCE(rc."precio_kw_P6",0::real)*365.0
-        - COALESCE(rc.surpluses,0) * (182.5::double precision / NULLIF(rc.days::numeric,0)) * COALESCE(rc.autoconsumo_precio,0)
-      ) * 1.05113 * (1 + COALESCE(rc."VAT",0)),
-      0::double precision
-    )
-  ) AS saving_percentage,
+  CASE
+    WHEN rc.new_company IS NOT NULL THEN
+      rc.savings_yearly / NULLIF(
+        (
+          COALESCE(rc.anual_consumption_p1,0::real)*COALESCE(rc."precio_kwh_P1",0::real) +
+          COALESCE(rc.anual_consumption_p2,0::real)*COALESCE(rc."precio_kwh_P2",0::real) +
+          COALESCE(rc.anual_consumption_p3,0::real)*COALESCE(rc."precio_kwh_P3",0::real) +
+          COALESCE(rc.anual_consumption_p4,0::real)*COALESCE(rc."precio_kwh_P4",0::real) +
+          COALESCE(rc.anual_consumption_p5,0::real)*COALESCE(rc."precio_kwh_P5",0::real) +
+          COALESCE(rc.anual_consumption_p6,0::real)*COALESCE(rc."precio_kwh_P6",0::real) +
+          COALESCE(NULLIF(rc.power_p1,0::double precision),1::real)*COALESCE(rc."precio_kw_P1",0::real)*365.0 +
+          COALESCE(rc.power_p2,0::real)*COALESCE(rc."precio_kw_P2",0::real)*365.0 +
+          COALESCE(rc.power_p3,0::real)*COALESCE(rc."precio_kw_P3",0::real)*365.0 +
+          COALESCE(rc.power_p4,0::real)*COALESCE(rc."precio_kw_P4",0::real)*365.0 +
+          COALESCE(rc.power_p5,0::real)*COALESCE(rc."precio_kw_P5",0::real)*365.0 +
+          COALESCE(rc.power_p6,0::real)*COALESCE(rc."precio_kw_P6",0::real)*365.0
+          - COALESCE(rc.surpluses,0) * (182.5::double precision / NULLIF(rc.days::numeric,0)) * COALESCE(rc.autoconsumo_precio,0)
+        ) * 1.05113 * (1 + COALESCE(rc."VAT",0)),
+        0::double precision
+      )
+    ELSE 0.0
+  END AS saving_percentage,
 
   -- supervisors, client/advisor info, filtros y búsqueda
   us.supervisors,
