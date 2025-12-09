@@ -526,8 +526,10 @@ SELECT DISTINCT
   ARRAY[COALESCE(u.email,''::text),'All'] AS advisor_filter,
   EXTRACT(MONTH FROM rc.created_at)::text AS created_month,
   EXTRACT(YEAR  FROM rc.created_at)::text AS created_year,
+  COALESCE(rc."CUPS",'') || ' ' ||
+  COALESCE(u.name,'') || ' ' ||
+  COALESCE(u.email,'') || ' ' ||
   LOWER(
-    COALESCE(rc."CUPS",'') || ' ' ||
     COALESCE(rc.client_email,'') || ' ' ||
     COALESCE(rc.company,'') || ' ' ||
     COALESCE(rc.rate_name,'') || ' ' ||
