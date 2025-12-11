@@ -650,9 +650,9 @@ SELECT DISTINCT
 
   0.0::numeric(8,2) AS daily_maintenance_with_vat,
   rc.has_permanence,
-  rc.rate_i_have,
   rc.rate_mode,
-  rc.total_excedentes_precio 
+  rc.total_excedentes_precio,
+  rc.rate_i_have 
 
 FROM all_comparisons_ranked rc
 LEFT JOIN _users_supervisors us ON rc.advisor_id = us.user_id
