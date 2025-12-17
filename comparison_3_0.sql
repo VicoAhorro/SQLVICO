@@ -1,4 +1,4 @@
--- DROP VIEW IF EXISTS public._comparisons_detailed_3_0;
+DROP VIEW IF EXISTS public._comparisons_detailed_3_0;
 
 CREATE OR REPLACE VIEW public._comparisons_detailed_3_0 AS
 WITH calculated_prices_3_0 AS (
@@ -91,12 +91,12 @@ WITH calculated_prices_3_0 AS (
 -- ================================================================================
 -- TOTAL CONSUMPTION PRICE
 -- ================================================================================
-    COALESCE(c30.consumption_p1,0::real)*COALESCE(cr.price_cp1,0::real) +
-    COALESCE(c30.consumption_p2,0::real)*COALESCE(cr.price_cp2,0::real) +
-    COALESCE(c30.consumption_p3,0::real)*COALESCE(cr.price_cp3,0::real) +
-    COALESCE(c30.consumption_p4,0::real)*COALESCE(cr.price_cp4,0::real) +
-    COALESCE(c30.consumption_p5,0::real)*COALESCE(cr.price_cp5,0::real) +
-    COALESCE(c30.consumption_p6,0::real)*COALESCE(cr.price_cp6,0::real) AS total_consumption_price,
+    COALESCE(c30.consumption_p1,0::numeric)*COALESCE(cr.price_cp1,0::numeric) +
+    COALESCE(c30.consumption_p2,0::numeric)*COALESCE(cr.price_cp2,0::numeric) +
+    COALESCE(c30.consumption_p3,0::numeric)*COALESCE(cr.price_cp3,0::numeric) +
+    COALESCE(c30.consumption_p4,0::numeric)*COALESCE(cr.price_cp4,0::numeric) +
+    COALESCE(c30.consumption_p5,0::numeric)*COALESCE(cr.price_cp5,0::numeric) +
+    COALESCE(c30.consumption_p6,0::numeric)*COALESCE(cr.price_cp6,0::numeric) AS total_consumption_price,
 -- ================================================================================
 -- NEW TOTAL PRICE
 -- ================================================================================
@@ -147,68 +147,67 @@ WITH calculated_prices_3_0 AS (
     c30.region
     
   FROM comparison_3_0 c30
-  LEFT JOIN users u
+  LEFT JOIN users u 
   ON u.user_id = c30.advisor_id
-  LEFT JOIN comparison_rates cr
-  ON cr.type = '3_0'
-    AND cr.company <> c30.company
-    AND (cr.deleted = FALSE)
-    AND (cr.tenant_id IS NULL OR u.tenant = ANY(cr.tenant_id))
-    -- Filtro de mes/año solo si la tarifa es indexada
-    AND (
-          cr.rate_mode::text <> 'Indexada'
-          OR (
+  LEFT JOIN LATERAL (
+    SELECT cr.*
+    FROM comparison_rates cr
+    WHERE cr.type = '3_0'
+      AND (
+        -- Caso forzado: si el cliente viene de Fija y la tarifa es Indexada, solo se usa esta rate concreta (sin más filtros)
+        (
+          c30.rate_i_have = 'Fija'
+          AND c30.rate_i_want = 'Indexada'
+          AND cr.id = 'febdbb18-8de5-4f2c-982a-ddfe2e18b3c8'
+        )
+        -- Resto de casos: aplican los filtros habituales
+        OR (
+          (c30.rate_i_have IS DISTINCT FROM 'Fija' OR cr.rate_mode IS DISTINCT FROM 'Indexada')
+          AND cr.company <> c30.company
+          AND (cr.deleted = FALSE)
+          AND (cr.tenant_id IS NULL OR u.tenant = ANY (cr.tenant_id))
+          AND (
+            cr.rate_mode::text <> 'Indexada'
+            OR (
               (cr.invoice_month IS NULL AND cr.invoice_year IS NULL)
-            OR (cr.invoice_month = c30.invoice_month AND cr.invoice_year = c30.invoice_year)
+              OR (cr.invoice_month = c30.invoice_month AND cr.invoice_year = c30.invoice_year)
+            )
           )
-    )
-    -- Subrate preferida (si hay)
-    AND (
-          c30.preferred_subrate IS NULL
-          OR c30.preferred_subrate = ''
-          OR cr.subrate_name = c30.preferred_subrate
-    )
-  -- ⬇️ Filtro de permanencia:
- AND (
-      -- Si wants_permanence es NULL → acepta cualquier tarifa (con o sin permanencia)
-      c30.wants_permanence IS NULL
-      -- Si NO quiere permanencia (FALSE) → rechazar tarifas con permanencia
-      OR (c30.wants_permanence = FALSE AND COALESCE(cr.has_permanence, FALSE) = FALSE)
-      -- Si SÍ quiere permanencia (TRUE) → aceptar solo con permanencia (o todas si no existe ninguna)
-      OR (
-           c30.wants_permanence = TRUE
-           AND (
-                cr.has_permanence = TRUE
-                OR NOT EXISTS (
-                     SELECT 1
-                     FROM comparison_rates crp
-                     WHERE crp.type = '3_0'
-                       AND crp.company <> c30.company
-                       AND (
-                            crp.rate_mode::text <> 'Indexada'
-                            OR (
-                                 (crp.invoice_month IS NULL AND crp.invoice_year IS NULL)
-                              OR (crp.invoice_month = c30.invoice_month AND crp.invoice_year = c30.invoice_year)
-                            )
-                       )
-                       AND (
-                            c30.preferred_subrate IS NULL
-                            OR c30.preferred_subrate = ''
-                            OR crp.subrate_name = c30.preferred_subrate
-                       )
-                       AND (c30.region IS NULL OR c30.region = ANY (crp.region))
-                       AND crp.has_permanence = TRUE
+          AND (
+            c30.preferred_subrate IS NULL
+            OR c30.preferred_subrate = ''
+            OR cr.subrate_name = c30.preferred_subrate
+          )
+          AND (
+            c30.wants_permanence IS NOT TRUE
+            OR cr.has_permanence = TRUE
+            OR NOT EXISTS (
+              SELECT 1
+              FROM comparison_rates crp
+              WHERE crp.type = '3_0'
+                AND crp.company <> c30.company
+                AND (
+                  crp.rate_mode::text <> 'Indexada'
+                  OR (
+                    (crp.invoice_month IS NULL AND crp.invoice_year IS NULL)
+                    OR (crp.invoice_month = c30.invoice_month AND crp.invoice_year = c30.invoice_year)
+                  )
                 )
-           )
+                AND (
+                  c30.preferred_subrate IS NULL
+                  OR c30.preferred_subrate = ''
+                  OR crp.subrate_name = c30.preferred_subrate
+                )
+                AND (c30.region IS NULL OR c30.region = ANY (crp.region))
+                AND crp.has_permanence = TRUE
+            )
+          )
+          AND (cr.cif IS NULL OR cr.cif = c30.cif)
+          AND (c30.region IS NULL OR c30.region = ANY (cr.region))
+        )
       )
- )
- AND (
-      cr.cif IS NULL
-      OR c30.cif IS NULL
-      OR cr.cif = c30.cif
- )
+  ) cr ON TRUE
   WHERE (c30.deleted IS NULL OR c30.deleted = FALSE)
-    AND (c30.region IS NULL OR c30.region = ANY (cr.region))
 ),
 unified_calculated_prices AS (
   SELECT * FROM calculated_prices_3_0
@@ -217,6 +216,7 @@ unified_extended_prices AS (
   SELECT
     ucp.*,
     crs.id AS crs_id,
+    c30_base.rate_i_want,
 
     COALESCE(ucp.anual_consumption_p1,0::real)*COALESCE(crs.crs_cp1,0::real) +
     COALESCE(ucp.anual_consumption_p2,0::real)*COALESCE(crs.crs_cp2,0::real) +
@@ -234,35 +234,148 @@ unified_extended_prices AS (
 
     CASE
       WHEN ucp.new_company IS NOT NULL THEN
-        (
-          (
-            (COALESCE(ucp.anual_consumption_p1,0::real)*COALESCE(ucp."precio_kwh_P1",0::real) +
-             COALESCE(ucp.anual_consumption_p2,0::real)*COALESCE(ucp."precio_kwh_P2",0::real) +
-             COALESCE(ucp.anual_consumption_p3,0::real)*COALESCE(ucp."precio_kwh_P3",0::real) +
-             COALESCE(ucp.anual_consumption_p4,0::real)*COALESCE(ucp."precio_kwh_P4",0::real) +
-             COALESCE(ucp.anual_consumption_p5,0::real)*COALESCE(ucp."precio_kwh_P5",0::real) +
-             COALESCE(ucp.anual_consumption_p6,0::real)*COALESCE(ucp."precio_kwh_P6",0::real) +
-             COALESCE(NULLIF(ucp.power_p1,0::double precision),1::real)*COALESCE(ucp."precio_kw_P1",0::real)*365.0 +
-             COALESCE(ucp.power_p2,0::real)*COALESCE(ucp."precio_kw_P2",0::real)*365.0 +
-             COALESCE(ucp.power_p3,0::real)*COALESCE(ucp."precio_kw_P3",0::real)*365.0 +
-             COALESCE(ucp.power_p4,0::real)*COALESCE(ucp."precio_kw_P4",0::real)*365.0 +
-             COALESCE(ucp.power_p5,0::real)*COALESCE(ucp."precio_kw_P5",0::real)*365.0 +
-             COALESCE(ucp.power_p6,0::real)*COALESCE(ucp."precio_kw_P6",0::real)*365.0
-             - COALESCE(ucp.surpluses,0) * (182.5::double precision / NULLIF(ucp.days::numeric,0)) * COALESCE(ucp.autoconsumo_precio,0)
+        CASE
+          -- Indexada vs Indexada
+          WHEN c30_base.rate_i_have = 'Indexada' AND ucp.rate_mode = 'Indexada' THEN
+            (
+                (
+                  (COALESCE(ucp.anual_consumption_p1,0::real)*COALESCE(ucp."precio_kwh_P1",0::real) +
+                  COALESCE(ucp.anual_consumption_p2,0::real)*COALESCE(ucp."precio_kwh_P2",0::real) +
+                  COALESCE(ucp.anual_consumption_p3,0::real)*COALESCE(ucp."precio_kwh_P3",0::real) +
+                  COALESCE(ucp.anual_consumption_p4,0::real)*COALESCE(ucp."precio_kwh_P4",0::real) +
+                  COALESCE(ucp.anual_consumption_p5,0::real)*COALESCE(ucp."precio_kwh_P5",0::real) +
+                  COALESCE(ucp.anual_consumption_p6,0::real)*COALESCE(ucp."precio_kwh_P6",0::real) +
+                  COALESCE(NULLIF(ucp.power_p1,0::double precision),1::real)*COALESCE(ucp."precio_kw_P1",0::real)*365.0 +
+                  COALESCE(ucp.power_p2,0::real)*COALESCE(ucp."precio_kw_P2",0::real)*365.0 +
+                  COALESCE(ucp.power_p3,0::real)*COALESCE(ucp."precio_kw_P3",0::real)*365.0 +
+                  COALESCE(ucp.power_p4,0::real)*COALESCE(ucp."precio_kw_P4",0::real)*365.0 +
+                  COALESCE(ucp.power_p5,0::real)*COALESCE(ucp."precio_kw_P5",0::real)*365.0 +
+                  COALESCE(ucp.power_p6,0::real)*COALESCE(ucp."precio_kw_P6",0::real)*365.0
+                  - COALESCE(ucp.surpluses,0) * (182.5::double precision / NULLIF(ucp.days::numeric,0)) * COALESCE(ucp.autoconsumo_precio,0)
+                  )
+                  * 1.05113
+                ) * (1 + COALESCE(ucp."VAT",0))
+                -
+                (
+                  COALESCE(ucp.total_consumption_price,0) / NULLIF(ucp.total_consumption,0) * COALESCE(ucp.total_anual_consumption,0) +
+                  COALESCE(ucp.power_p1,0::real)*COALESCE(ucp.price_pp1,0::real)*365.0 +
+                  COALESCE(ucp.power_p2,0::real)*COALESCE(ucp.price_pp2,0::real)*365.0 +
+                  COALESCE(ucp.power_p3,0::real)*COALESCE(ucp.price_pp3,0::real)*365.0 +
+                  COALESCE(ucp.power_p4,0::real)*COALESCE(ucp.price_pp4,0::real)*365.0 +
+                  COALESCE(ucp.power_p5,0::real)*COALESCE(ucp.price_pp5,0::real)*365.0 +
+                  COALESCE(ucp.power_p6,0::real)*COALESCE(ucp.price_pp6,0::real)*365.0
+                ) * 1.05113 * (1 + COALESCE(ucp."VAT",0))
             )
-            * 1.05113
-          ) * (1 + COALESCE(ucp."VAT",0))
-          -
-          (
-            COALESCE(ucp.total_consumption_price,0) / NULLIF(ucp.total_consumption,0) * COALESCE(ucp.total_anual_consumption,0) +
-            COALESCE(ucp.power_p1,0::real)*COALESCE(ucp.price_pp1,0::real)*365.0 +
-            COALESCE(ucp.power_p2,0::real)*COALESCE(ucp.price_pp2,0::real)*365.0 +
-            COALESCE(ucp.power_p3,0::real)*COALESCE(ucp.price_pp3,0::real)*365.0 +
-            COALESCE(ucp.power_p4,0::real)*COALESCE(ucp.price_pp4,0::real)*365.0 +
-            COALESCE(ucp.power_p5,0::real)*COALESCE(ucp.price_pp5,0::real)*365.0 +
-            COALESCE(ucp.power_p6,0::real)*COALESCE(ucp.price_pp6,0::real)*365.0
-          ) * 1.05113 * (1 + COALESCE(ucp."VAT",0))
-        )
+          -- Fija vs Fija
+          WHEN c30_base.rate_i_have = 'Fija' AND ucp.rate_mode = 'Fija' THEN
+            (
+              (
+                  (COALESCE(ucp.anual_consumption_p1,0::real)*COALESCE(ucp."precio_kwh_P1",0::real) +
+                  COALESCE(ucp.anual_consumption_p2,0::real)*COALESCE(ucp."precio_kwh_P2",0::real) +
+                  COALESCE(ucp.anual_consumption_p3,0::real)*COALESCE(ucp."precio_kwh_P3",0::real) +
+                  COALESCE(ucp.anual_consumption_p4,0::real)*COALESCE(ucp."precio_kwh_P4",0::real) +
+                  COALESCE(ucp.anual_consumption_p5,0::real)*COALESCE(ucp."precio_kwh_P5",0::real) +
+                  COALESCE(ucp.anual_consumption_p6,0::real)*COALESCE(ucp."precio_kwh_P6",0::real) +
+                  COALESCE(NULLIF(ucp.power_p1,0::double precision),1::real)*COALESCE(ucp."precio_kw_P1",0::real)*365.0 +
+                  COALESCE(ucp.power_p2,0::real)*COALESCE(ucp."precio_kw_P2",0::real)*365.0 +
+                  COALESCE(ucp.power_p3,0::real)*COALESCE(ucp."precio_kw_P3",0::real)*365.0 +
+                  COALESCE(ucp.power_p4,0::real)*COALESCE(ucp."precio_kw_P4",0::real)*365.0 +
+                  COALESCE(ucp.power_p5,0::real)*COALESCE(ucp."precio_kw_P5",0::real)*365.0 +
+                  COALESCE(ucp.power_p6,0::real)*COALESCE(ucp."precio_kw_P6",0::real)*365.0
+                  - COALESCE(ucp.surpluses,0) * (182.5::double precision / NULLIF(ucp.days::numeric,0)) * COALESCE(ucp.autoconsumo_precio,0)
+                  )
+                  * 1.05113
+                ) * (1 + COALESCE(ucp."VAT",0))
+                -
+                (
+                  COALESCE(ucp.anual_consumption_p1,0::real)*COALESCE(ucp.price_cp1,0::real) +
+                  COALESCE(ucp.anual_consumption_p2,0::real)*COALESCE(ucp.price_cp2,0::real) +
+                  COALESCE(ucp.anual_consumption_p3,0::real)*COALESCE(ucp.price_cp3,0::real) +
+                  COALESCE(ucp.anual_consumption_p4,0::real)*COALESCE(ucp.price_cp4,0::real) +
+                  COALESCE(ucp.anual_consumption_p5,0::real)*COALESCE(ucp.price_cp5,0::real) +
+                  COALESCE(ucp.anual_consumption_p6,0::real)*COALESCE(ucp.price_cp6,0::real) +
+                  COALESCE(ucp.power_p1,0::real)*COALESCE(ucp.price_pp1,0::real)*365.0 +
+                  COALESCE(ucp.power_p2,0::real)*COALESCE(ucp.price_pp2,0::real)*365.0 +
+                  COALESCE(ucp.power_p3,0::real)*COALESCE(ucp.price_pp3,0::real)*365.0 +
+                  COALESCE(ucp.power_p4,0::real)*COALESCE(ucp.price_pp4,0::real)*365.0 +
+                  COALESCE(ucp.power_p5,0::real)*COALESCE(ucp.price_pp5,0::real)*365.0 +
+                  COALESCE(ucp.power_p6,0::real)*COALESCE(ucp.price_pp6,0::real)*365.0
+                ) * 1.05113 * (1 + COALESCE(ucp."VAT",0))
+            )
+          -- Indexada vs Fija
+          WHEN c30_base.rate_i_have = 'Indexada' AND ucp.rate_mode = 'Fija' THEN
+            (
+              (
+                  (COALESCE(ucp.anual_consumption_p1,0::real)*COALESCE(ucp."precio_kwh_P1",0::real) +
+                  COALESCE(ucp.anual_consumption_p2,0::real)*COALESCE(ucp."precio_kwh_P2",0::real) +
+                  COALESCE(ucp.anual_consumption_p3,0::real)*COALESCE(ucp."precio_kwh_P3",0::real) +
+                  COALESCE(ucp.anual_consumption_p4,0::real)*COALESCE(ucp."precio_kwh_P4",0::real) +
+                  COALESCE(ucp.anual_consumption_p5,0::real)*COALESCE(ucp."precio_kwh_P5",0::real) +
+                  COALESCE(ucp.anual_consumption_p6,0::real)*COALESCE(ucp."precio_kwh_P6",0::real) +
+                  COALESCE(NULLIF(ucp.power_p1,0::double precision),1::real)*COALESCE(ucp."precio_kw_P1",0::real)*365.0 +
+                  COALESCE(ucp.power_p2,0::real)*COALESCE(ucp."precio_kw_P2",0::real)*365.0 +
+                  COALESCE(ucp.power_p3,0::real)*COALESCE(ucp."precio_kw_P3",0::real)*365.0 +
+                  COALESCE(ucp.power_p4,0::real)*COALESCE(ucp."precio_kw_P4",0::real)*365.0 +
+                  COALESCE(ucp.power_p5,0::real)*COALESCE(ucp."precio_kw_P5",0::real)*365.0 +
+                  COALESCE(ucp.power_p6,0::real)*COALESCE(ucp."precio_kw_P6",0::real)*365.0
+                  - COALESCE(ucp.surpluses,0) * (182.5::double precision / NULLIF(ucp.days::numeric,0)) * COALESCE(ucp.autoconsumo_precio,0)
+                  )
+                  * 1.05113
+                ) * (1 + COALESCE(ucp."VAT",0))
+                -
+                (
+                  COALESCE(ucp.anual_consumption_p1,0::real)*COALESCE(ucp.price_cp1,0::real) +
+                  COALESCE(ucp.anual_consumption_p2,0::real)*COALESCE(ucp.price_cp2,0::real) +
+                  COALESCE(ucp.anual_consumption_p3,0::real)*COALESCE(ucp.price_cp3,0::real) +
+                  COALESCE(ucp.anual_consumption_p4,0::real)*COALESCE(ucp.price_cp4,0::real) +
+                  COALESCE(ucp.anual_consumption_p5,0::real)*COALESCE(ucp.price_cp5,0::real) +
+                  COALESCE(ucp.anual_consumption_p6,0::real)*COALESCE(ucp.price_cp6,0::real) +
+                  COALESCE(ucp.power_p1,0::real)*COALESCE(ucp.price_pp1,0::real)*365.0 +
+                  COALESCE(ucp.power_p2,0::real)*COALESCE(ucp.price_pp2,0::real)*365.0 +
+                  COALESCE(ucp.power_p3,0::real)*COALESCE(ucp.price_pp3,0::real)*365.0 +
+                  COALESCE(ucp.power_p4,0::real)*COALESCE(ucp.price_pp4,0::real)*365.0 +
+                  COALESCE(ucp.power_p5,0::real)*COALESCE(ucp.price_pp5,0::real)*365.0 +
+                  COALESCE(ucp.power_p6,0::real)*COALESCE(ucp.price_pp6,0::real)*365.0
+                ) * 1.05113 * (1 + COALESCE(ucp."VAT",0))
+            )
+          -- Fija vs Indexada
+          WHEN c30_base.rate_i_have = 'Fija' AND ucp.rate_mode = 'Indexada' THEN
+            (
+              (
+                  (COALESCE(ucp.anual_consumption_p1,0::real)*COALESCE(ucp."precio_kwh_P1",0::real) +
+                  COALESCE(ucp.anual_consumption_p2,0::real)*COALESCE(ucp."precio_kwh_P2",0::real) +
+                  COALESCE(ucp.anual_consumption_p3,0::real)*COALESCE(ucp."precio_kwh_P3",0::real) +
+                  COALESCE(ucp.anual_consumption_p4,0::real)*COALESCE(ucp."precio_kwh_P4",0::real) +
+                  COALESCE(ucp.anual_consumption_p5,0::real)*COALESCE(ucp."precio_kwh_P5",0::real) +
+                  COALESCE(ucp.anual_consumption_p6,0::real)*COALESCE(ucp."precio_kwh_P6",0::real) +
+                  COALESCE(NULLIF(ucp.power_p1,0::double precision),1::real)*COALESCE(ucp."precio_kw_P1",0::real)*365.0 +
+                  COALESCE(ucp.power_p2,0::real)*COALESCE(ucp."precio_kw_P2",0::real)*365.0 +
+                  COALESCE(ucp.power_p3,0::real)*COALESCE(ucp."precio_kw_P3",0::real)*365.0 +
+                  COALESCE(ucp.power_p4,0::real)*COALESCE(ucp."precio_kw_P4",0::real)*365.0 +
+                  COALESCE(ucp.power_p5,0::real)*COALESCE(ucp."precio_kw_P5",0::real)*365.0 +
+                  COALESCE(ucp.power_p6,0::real)*COALESCE(ucp."precio_kw_P6",0::real)*365.0
+                  - COALESCE(ucp.surpluses,0) * (182.5::double precision / NULLIF(ucp.days::numeric,0)) * COALESCE(ucp.autoconsumo_precio,0)
+                  )
+                  * 1.05113
+                ) * (1 + COALESCE(ucp."VAT",0))
+                -
+                (
+                  COALESCE(ucp.anual_consumption_p1,0::real)*COALESCE(ucp.price_cp1,0::real) +
+                  COALESCE(ucp.anual_consumption_p2,0::real)*COALESCE(ucp.price_cp2,0::real) +
+                  COALESCE(ucp.anual_consumption_p3,0::real)*COALESCE(ucp.price_cp3,0::real) +
+                  COALESCE(ucp.anual_consumption_p4,0::real)*COALESCE(ucp.price_cp4,0::real) +
+                  COALESCE(ucp.anual_consumption_p5,0::real)*COALESCE(ucp.price_cp5,0::real) +
+                  COALESCE(ucp.anual_consumption_p6,0::real)*COALESCE(ucp.price_cp6,0::real) +
+                  COALESCE(ucp.power_p1,0::real)*COALESCE(ucp.price_pp1,0::real)*365.0 +
+                  COALESCE(ucp.power_p2,0::real)*COALESCE(ucp.price_pp2,0::real)*365.0 +
+                  COALESCE(ucp.power_p3,0::real)*COALESCE(ucp.price_pp3,0::real)*365.0 +
+                  COALESCE(ucp.power_p4,0::real)*COALESCE(ucp.price_pp4,0::real)*365.0 +
+                  COALESCE(ucp.power_p5,0::real)*COALESCE(ucp.price_pp5,0::real)*365.0 +
+                  COALESCE(ucp.power_p6,0::real)*COALESCE(ucp.price_pp6,0::real)*365.0
+                ) * 1.05113 * (1 + COALESCE(ucp."VAT",0))
+            )
+          ELSE 0.0
+        END
       ELSE 0.0
     END AS savings_yearly,
 
@@ -273,6 +386,7 @@ unified_extended_prices AS (
       ELSE 0.0
     END AS savings
   FROM unified_calculated_prices ucp
+  LEFT JOIN comparison_3_0 c30_base ON c30_base.id = ucp.id
   LEFT JOIN comparison_rates_crs crs
     ON crs.comparison_rate_id = ucp.new_rate_id
    AND (crs.min_kw_anual IS NULL OR ucp.total_anual_consumption >= crs.min_kw_anual)
@@ -280,24 +394,44 @@ unified_extended_prices AS (
    AND (crs.min_power   IS NULL OR ucp.power_p1 >= crs.min_power)
    AND (crs.max_power   IS NULL OR ucp.power_p1 <  crs.max_power)
 ),
-ranked_comparisons AS (
+filtered_prices AS (
   SELECT
     uep.*,
+    u.tenant,
+    c30.wants_permanence,
+    c30.region AS c30_region,
+    c30.cif AS c30_cif
+  FROM unified_extended_prices uep
+  LEFT JOIN comparison_3_0 c30 ON c30.id = uep.id
+  LEFT JOIN users u ON u.user_id = c30.advisor_id
+),
+ranked_comparisons AS (
+  SELECT
+    fp.*,
     CASE
-      WHEN uep.new_company IS NOT NULL AND uep.savings_yearly > 0
-        THEN uep.savings_yearly + COALESCE(uep.total_crs,0::real) * 4
-      ELSE uep.savings_yearly + COALESCE(uep.total_crs,0::real) * 4
+      WHEN fp.new_company IS NOT NULL AND fp.savings_yearly > 0
+        THEN fp.savings_yearly + COALESCE(fp.total_crs,0::real) * 4
+      ELSE fp.savings_yearly + COALESCE(fp.total_crs,0::real) * 4
     END AS ranked_crs,
     ROW_NUMBER() OVER (
-      PARTITION BY uep.id
+      PARTITION BY fp.id, fp.rate_mode
       ORDER BY
         CASE
-          WHEN uep.new_company IS NOT NULL AND uep.savings_yearly > 0
-            THEN uep.savings_yearly + COALESCE(uep.total_crs,0::real) * 4
-          ELSE uep.savings_yearly + COALESCE(uep.total_crs,0::real) * 4
+          WHEN fp.new_company IS NOT NULL AND fp.savings_yearly > 0
+            THEN fp.savings_yearly + COALESCE(fp.total_crs,0::real) * 4
+          ELSE fp.savings_yearly + COALESCE(fp.total_crs,0::real) * 4
+        END DESC
+    ) AS rank_by_mode,
+    ROW_NUMBER() OVER (
+      PARTITION BY fp.id
+      ORDER BY
+        CASE
+          WHEN fp.new_company IS NOT NULL AND fp.savings_yearly > 0
+            THEN fp.savings_yearly + COALESCE(fp.total_crs,0::real) * 4
+          ELSE fp.savings_yearly + COALESCE(fp.total_crs,0::real) * 4
         END DESC
     ) AS rank
-  FROM unified_extended_prices uep
+  FROM filtered_prices fp
 ),
 all_comparisons_ranked AS (
   SELECT * FROM ranked_comparisons
@@ -470,52 +604,28 @@ SELECT DISTINCT
   ) * (1::double precision + COALESCE(rc."VAT",0::real)) AS new_total_yearly_price_with_vat,
 
   -- saving_percentage
-  (
-    (
-      (
-        COALESCE(rc.anual_consumption_p1,0::real)*COALESCE(rc."precio_kwh_P1",0::real) +
-        COALESCE(rc.anual_consumption_p2,0::real)*COALESCE(rc."precio_kwh_P2",0::real) +
-        COALESCE(rc.anual_consumption_p3,0::real)*COALESCE(rc."precio_kwh_P3",0::real) +
-        COALESCE(rc.anual_consumption_p4,0::real)*COALESCE(rc."precio_kwh_P4",0::real) +
-        COALESCE(rc.anual_consumption_p5,0::real)*COALESCE(rc."precio_kwh_P5",0::real) +
-        COALESCE(rc.anual_consumption_p6,0::real)*COALESCE(rc."precio_kwh_P6",0::real) +
-        COALESCE(NULLIF(rc.power_p1,0::double precision),1::real)*COALESCE(rc."precio_kw_P1",0::real)*365.0 +
-        COALESCE(rc.power_p2,0::real)*COALESCE(rc."precio_kw_P2",0::real)*365.0 +
-        COALESCE(rc.power_p3,0::real)*COALESCE(rc."precio_kw_P3",0::real)*365.0 +
-        COALESCE(rc.power_p4,0::real)*COALESCE(rc."precio_kw_P4",0::real)*365.0 +
-        COALESCE(rc.power_p5,0::real)*COALESCE(rc."precio_kw_P5",0::real)*365.0 +
-        COALESCE(rc.power_p6,0::real)*COALESCE(rc."precio_kw_P6",0::real)*365.0
-        - COALESCE(rc.surpluses,0) * (182.5::double precision / NULLIF(rc.days::numeric,0)) * COALESCE(rc.autoconsumo_precio,0)
-      ) * 1.05113 * (1 + COALESCE(rc."VAT",0))
-      -
-      (
-        COALESCE(rc.total_consumption_price,0::real) / NULLIF(rc.total_consumption,0::real) * COALESCE(rc.total_anual_consumption,0::real) +
-        COALESCE(rc.power_p1,0::real)*COALESCE(rc.price_pp1,0::real)*365.0 +
-        COALESCE(rc.power_p2,0::real)*COALESCE(rc.price_pp2,0::real)*365.0 +
-        COALESCE(rc.power_p3,0::real)*COALESCE(rc.price_pp3,0::real)*365.0 +
-        COALESCE(rc.power_p4,0::real)*COALESCE(rc.price_pp4,0::real)*365.0 +
-        COALESCE(rc.power_p5,0::real)*COALESCE(rc.price_pp5,0::real)*365.0 +
-        COALESCE(rc.power_p6,0)*COALESCE(rc.price_pp6,0)*365.0
-      ) * 1.05113 * (1 + COALESCE(rc."VAT",0))
-    ) / NULLIF(
-      (
-        COALESCE(rc.anual_consumption_p1,0::real)*COALESCE(rc."precio_kwh_P1",0::real) +
-        COALESCE(rc.anual_consumption_p2,0::real)*COALESCE(rc."precio_kwh_P2",0::real) +
-        COALESCE(rc.anual_consumption_p3,0::real)*COALESCE(rc."precio_kwh_P3",0::real) +
-        COALESCE(rc.anual_consumption_p4,0::real)*COALESCE(rc."precio_kwh_P4",0::real) +
-        COALESCE(rc.anual_consumption_p5,0::real)*COALESCE(rc."precio_kwh_P5",0::real) +
-        COALESCE(rc.anual_consumption_p6,0::real)*COALESCE(rc."precio_kwh_P6",0::real) +
-        COALESCE(NULLIF(rc.power_p1,0::double precision),1::real)*COALESCE(rc."precio_kw_P1",0::real)*365.0 +
-        COALESCE(rc.power_p2,0::real)*COALESCE(rc."precio_kw_P2",0::real)*365.0 +
-        COALESCE(rc.power_p3,0::real)*COALESCE(rc."precio_kw_P3",0::real)*365.0 +
-        COALESCE(rc.power_p4,0::real)*COALESCE(rc."precio_kw_P4",0::real)*365.0 +
-        COALESCE(rc.power_p5,0::real)*COALESCE(rc."precio_kw_P5",0::real)*365.0 +
-        COALESCE(rc.power_p6,0::real)*COALESCE(rc."precio_kw_P6",0::real)*365.0
-        - COALESCE(rc.surpluses,0) * (182.5::double precision / NULLIF(rc.days::numeric,0)) * COALESCE(rc.autoconsumo_precio,0)
-      ) * 1.05113 * (1 + COALESCE(rc."VAT",0)),
-      0::double precision
-    )
-  ) AS saving_percentage,
+  CASE
+    WHEN rc.new_company IS NOT NULL THEN
+      rc.savings_yearly / NULLIF(
+        (
+          COALESCE(rc.anual_consumption_p1,0::real)*COALESCE(rc."precio_kwh_P1",0::real) +
+          COALESCE(rc.anual_consumption_p2,0::real)*COALESCE(rc."precio_kwh_P2",0::real) +
+          COALESCE(rc.anual_consumption_p3,0::real)*COALESCE(rc."precio_kwh_P3",0::real) +
+          COALESCE(rc.anual_consumption_p4,0::real)*COALESCE(rc."precio_kwh_P4",0::real) +
+          COALESCE(rc.anual_consumption_p5,0::real)*COALESCE(rc."precio_kwh_P5",0::real) +
+          COALESCE(rc.anual_consumption_p6,0::real)*COALESCE(rc."precio_kwh_P6",0::real) +
+          COALESCE(NULLIF(rc.power_p1,0::double precision),1::real)*COALESCE(rc."precio_kw_P1",0::real)*365.0 +
+          COALESCE(rc.power_p2,0::real)*COALESCE(rc."precio_kw_P2",0::real)*365.0 +
+          COALESCE(rc.power_p3,0::real)*COALESCE(rc."precio_kw_P3",0::real)*365.0 +
+          COALESCE(rc.power_p4,0::real)*COALESCE(rc."precio_kw_P4",0::real)*365.0 +
+          COALESCE(rc.power_p5,0::real)*COALESCE(rc."precio_kw_P5",0::real)*365.0 +
+          COALESCE(rc.power_p6,0::real)*COALESCE(rc."precio_kw_P6",0::real)*365.0
+          - COALESCE(rc.surpluses,0) * (182.5::double precision / NULLIF(rc.days::numeric,0)) * COALESCE(rc.autoconsumo_precio,0)
+        ) * 1.05113 * (1 + COALESCE(rc."VAT",0)),
+        0::double precision
+      )
+    ELSE 0.0
+  END AS saving_percentage,
 
   -- supervisors, client/advisor info, filtros y búsqueda
   us.supervisors,
@@ -526,10 +636,8 @@ SELECT DISTINCT
   ARRAY[COALESCE(u.email,''::text),'All'] AS advisor_filter,
   EXTRACT(MONTH FROM rc.created_at)::text AS created_month,
   EXTRACT(YEAR  FROM rc.created_at)::text AS created_year,
-  COALESCE(rc."CUPS",'') || ' ' ||
-  COALESCE(u.name,'') || ' ' ||
-  COALESCE(u.email,'') || ' ' ||
   LOWER(
+    COALESCE(rc."CUPS",'') || ' ' ||
     COALESCE(rc.client_email,'') || ' ' ||
     COALESCE(rc.company,'') || ' ' ||
     COALESCE(rc.rate_name,'') || ' ' ||
@@ -544,10 +652,14 @@ SELECT DISTINCT
   rc.has_permanence,
   rc.rate_mode,
   rc.total_excedentes_precio,
-  rc.rate_i_have
+  rc.rate_i_have 
 
 FROM all_comparisons_ranked rc
 LEFT JOIN _users_supervisors us ON rc.advisor_id = us.user_id
 LEFT JOIN users u               ON u.user_id     = rc.advisor_id
-WHERE rc.rank = 1
-  AND (rc.deleted IS NULL OR rc.deleted = FALSE);
+WHERE (rc.deleted IS NULL OR rc.deleted = FALSE)
+  AND (
+    (rc.rate_i_want IS NULL AND rc.rank = 1)
+    OR (rc.rate_i_want = 'Fija' AND rc.rate_mode = 'Fija' AND rc.rank_by_mode = 1)
+    OR (rc.rate_i_want = 'Indexada' AND rc.rate_mode = 'Indexada' AND rc.rank_by_mode = 1)
+  );

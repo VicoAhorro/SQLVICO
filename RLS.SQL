@@ -59,3 +59,22 @@ alter policy "select own client to auth"
 on "public"."clients"
 to authenticated
 using ((email = (auth.jwt() ->> 'email'::text)));
+
+CREATE POLICY "authenticated update"
+ON public.comparison_summary
+FOR UPDATE
+TO authenticated
+USING (true)
+WITH CHECK (true);
+
+CREATE POLICY "authenticated insert"
+ON public.comparison_summary
+FOR INSERT
+TO authenticated
+WITH CHECK (true);
+
+CREATE POLICY "authenticated select"
+ON public.comparison_summary
+FOR SELECT
+TO authenticated
+USING (true);

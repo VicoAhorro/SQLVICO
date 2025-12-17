@@ -91,15 +91,15 @@ WITH calculated_prices_3_0 AS (
 -- ================================================================================
 -- TOTAL CONSUMPTION PRICE
 -- ================================================================================
-    COALESCE(c30.consumption_p1,0::real)*COALESCE(cr.price_cp1,0::real) +
-    COALESCE(c30.consumption_p2,0::real)*COALESCE(cr.price_cp2,0::real) +
-    COALESCE(c30.consumption_p3,0::real)*COALESCE(cr.price_cp3,0::real) +
-    COALESCE(c30.consumption_p4,0::real)*COALESCE(cr.price_cp4,0::real) +
-    COALESCE(c30.consumption_p5,0::real)*COALESCE(cr.price_cp5,0::real) +
-    COALESCE(c30.consumption_p6,0::real)*COALESCE(cr.price_cp6,0::real) AS total_consumption_price,
+    COALESCE(c30.consumption_p1,0::numeric)*COALESCE(cr.price_cp1,0::numeric) +
+    COALESCE(c30.consumption_p2,0::numeric)*COALESCE(cr.price_cp2,0::numeric) +
+    COALESCE(c30.consumption_p3,0::numeric)*COALESCE(cr.price_cp3,0::numeric) +
+    COALESCE(c30.consumption_p4,0::numeric)*COALESCE(cr.price_cp4,0::numeric) +
+    COALESCE(c30.consumption_p5,0::numeric)*COALESCE(cr.price_cp5,0::numeric) +
+    COALESCE(c30.consumption_p6,0::numeric)*COALESCE(cr.price_cp6,0::numeric) AS total_consumption_price,
 -- ================================================================================
 -- NEW TOTAL PRICE
--- ================================================================================
+-- ================================================================================5816.87
     (
       (COALESCE(c30.power_p1,0::real) * COALESCE(cr.price_pp1,0::real) * COALESCE(c30.power_days,0))::double precision +
       (COALESCE(c30.power_p2,0::real) * COALESCE(cr.price_pp2,0::real) * COALESCE(c30.power_days,0))::double precision +
