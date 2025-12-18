@@ -64,12 +64,14 @@ base AS (
     cl.tarifa_plana,
     cl.cif,
     cl.region,
+    cl.term_month_i_want,
 
     -- Candidata de tarifas nuevas
     cr.id          AS new_rate_id,
     cr.company     AS new_company,
     cr.rate_name   AS new_rate_name,
     cr.subrate_name AS new_subrate_name,
+    cr.term_month,
 
     cr.price_pp1, cr.price_pp2, cr.price_pp3, cr.price_pp4, cr.price_pp5, cr.price_pp6,
     cr.price_cp1, cr.price_cp2, cr.price_cp3, cr.price_cp4, cr.price_cp5, cr.price_cp6,
@@ -566,7 +568,9 @@ SELECT DISTINCT
   rc.has_permanence,
   rc.rate_mode,
   rc.total_excedentes_precio,
-  null::rate_mode_type AS rate_i_have
+  null::rate_mode_type AS rate_i_have,
+  rc.term_month,
+  rc.term_month_i_want
 
 FROM with_advisor rc
 LEFT JOIN users u ON u.user_id = rc.advisor_id

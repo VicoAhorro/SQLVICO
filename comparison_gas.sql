@@ -73,11 +73,13 @@ calculated_prices_gas AS (
     cg.meter_rental,
     cg.preferred_subrate,
     cg.wants_permanence,
+    cg.term_month_i_want,
 
     -- Nueva tarifa (cr)
     cr.company                                   AS new_company,
     cr.rate_name                                 AS new_rate_name,
     cr.subrate_name                              AS new_subrate_name,
+    cr.term_month,
     cr.price_pp1,
     cr.price_pp2,
     cr.price_pp3,
@@ -600,7 +602,9 @@ SELECT
   rc.has_permanence,
   rc.rate_mode,
   rc.total_excedentes_precio,
-  NULL::rate_mode_type AS rate_i_have
+  NULL::rate_mode_type AS rate_i_have,
+  rc.term_month,
+  rc.term_month_i_want
 
 FROM all_comparisons_ranked rc
 LEFT JOIN _users_supervisors us ON rc.advisor_id = us.user_id
