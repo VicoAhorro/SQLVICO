@@ -2,9 +2,9 @@
 -- Este script la reconstruye con un swap usando ALTER MATERIALIZED VIEW (sin dropear la MV actual).
 -- Ojo: si tienes otras vistas que dependen de esta MV por OID, el swap por rename NO las redirige automáticamente.
 
-drop materialized view if exists public.mat_comparisons_historic__new;
+drop materialized view if exists public.mat_comparisons_historic;
 
-create materialized view public.mat_comparisons_historic__new as
+create materialized view public.mat_comparisons_historic as
 with
   base as (
     select
@@ -63,7 +63,7 @@ with
       cp.advisor_id,
       cp.temp_client_name,
       cp.temp_client_last_name,
-      cp."CUPS",
+      NULL as "CUPS",
       cp.pdf_invoice,
       'phone'::text as source,
       cp.deleted,
