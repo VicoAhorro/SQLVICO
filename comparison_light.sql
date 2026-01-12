@@ -98,8 +98,8 @@ base AS (
   -- 🔸 Filtro principal con fallback de mes/año + subrate
   -- =========================
   AND (
-      -- 1️⃣ Coincidencia exacta de mes/año + subrate (normal)
-      ((cr.invoice_month = cl.invoice_month AND cr.invoice_year = cl.invoice_year)
+      -- 1️⃣ Tarifas indexadas: solo filtra por subrate, sin mes/año
+      (cr.rate_mode = 'Indexada'
         AND (
             cl.preferred_subrate IS NULL
             OR cl.preferred_subrate = ''
@@ -107,12 +107,24 @@ base AS (
         )
       )
 
-      -- 2️⃣ Tarifas genéricas (sin periodo definido)
+      -- 2️⃣ Tarifas fijas: coincidencia exacta de mes/año + subrate
+      OR (cr.rate_mode <> 'Indexada'
+          AND ((cr.invoice_month = cl.invoice_month AND cr.invoice_year = cl.invoice_year)
+            AND (
+                cl.preferred_subrate IS NULL
+                OR cl.preferred_subrate = ''
+                OR LOWER(cr.subrate_name::text) = LOWER(cl.preferred_subrate::text)
+            )
+          )
+      )
+
+      -- 3️⃣ Tarifas genéricas (sin periodo definido)
       OR (cr.invoice_month IS NULL AND cr.invoice_year IS NULL)
 
-      -- 3️⃣ Fallback: si no hay tarifas del mes/año con esa preferred_subrate → permitir todas del mes/año
+      -- 4️⃣ Fallback: si no hay tarifas del mes/año con esa preferred_subrate → permitir todas del mes/año (solo fijas)
       OR (
-          (cr.invoice_month = cl.invoice_month AND cr.invoice_year = cl.invoice_year)
+          cr.rate_mode <> 'Indexada'
+          AND (cr.invoice_month = cl.invoice_month AND cr.invoice_year = cl.invoice_year)
           AND NOT EXISTS (
               SELECT 1
               FROM comparison_rates crs
@@ -120,13 +132,15 @@ base AS (
                 AND crs.company <> cl.company
                 AND crs.invoice_month = cl.invoice_month
                 AND crs.invoice_year = cl.invoice_year
+                AND crs.rate_mode <> 'Indexada'
                 AND LOWER(crs.subrate_name::text) = LOWER(cl.preferred_subrate::text)
           )
       )
 
-      -- 4️⃣ Fallback: si no hay tarifas del mes exacto → permitir cualquiera del mismo año
+      -- 5️⃣ Fallback: si no hay tarifas del mes exacto → permitir cualquiera del mismo año (solo fijas)
       OR (
-          cr.invoice_year = cl.invoice_year
+          cr.rate_mode <> 'Indexada'
+          AND cr.invoice_year = cl.invoice_year
           AND NOT EXISTS (
               SELECT 1
               FROM comparison_rates cry
@@ -134,6 +148,7 @@ base AS (
                 AND cry.company <> cl.company
                 AND cry.invoice_month = cl.invoice_month
                 AND cry.invoice_year = cl.invoice_year
+                AND cry.rate_mode <> 'Indexada'
           )
       )
   )
@@ -164,8 +179,11 @@ base AS (
           WHERE crp.type = 'light'
             AND crp.company <> cl.company
             AND (
-                  (crp.invoice_month IS NULL AND crp.invoice_year IS NULL)
-               OR (crp.invoice_month = cl.invoice_month AND crp.invoice_year = cl.invoice_year)
+                  -- Tarifas indexadas: sin filtro de mes/año
+                  (crp.rate_mode = 'Indexada')
+               OR -- Tarifas fijas: con filtro de mes/año
+                  ((crp.invoice_month IS NULL AND crp.invoice_year IS NULL)
+                   OR (crp.invoice_month = cl.invoice_month AND crp.invoice_year = cl.invoice_year))
             )
             AND (cl.region IS NULL OR cl.region = ANY (crp.region))
             AND (

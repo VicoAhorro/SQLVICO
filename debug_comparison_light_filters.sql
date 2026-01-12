@@ -6,7 +6,7 @@ WITH target AS (
     u.tenant AS advisor_tenant
   FROM comparison_light cl
   LEFT JOIN users u ON u.user_id = cl.advisor_id
-  WHERE cl.id = '03c8b391-23dc-47b2-b5ba-19ef7471ffc3'
+  WHERE cl.id = '3c707580-126c-4495-8946-f90c8218b1f2'
 ),
 candidates AS (
   SELECT
@@ -34,40 +34,53 @@ candidates AS (
     cr.has_permanence,
     cr.rate_mode,
 
-    -- Filtros de periodo/subrate (mismo orden que la vista principal)
-    (cr.invoice_month = t.invoice_month AND cr.invoice_year = t.invoice_year
+    -- Filtros de periodo/subrate (nueva lógica con rate_mode)
+    (cr.rate_mode = 'Indexada'
       AND (
         t.preferred_subrate IS NULL
         OR t.preferred_subrate = ''
         OR LOWER(cr.subrate_name::text) = LOWER(t.preferred_subrate::text)
       )
-    ) AS f_exact_period,
+    ) AS f_indexada_subrate,
+
+    (cr.rate_mode <> 'Indexada'
+      AND (cr.invoice_month = t.invoice_month AND cr.invoice_year = t.invoice_year)
+      AND (
+        t.preferred_subrate IS NULL
+        OR t.preferred_subrate = ''
+        OR LOWER(cr.subrate_name::text) = LOWER(t.preferred_subrate::text)
+      )
+    ) AS f_fija_period_subrate,
 
     (cr.invoice_month IS NULL AND cr.invoice_year IS NULL) AS f_generic_period,
 
     (
-      cr.invoice_month = t.invoice_month
+      cr.rate_mode <> 'Indexada'
+      AND cr.invoice_month = t.invoice_month
       AND cr.invoice_year = t.invoice_year
       AND NOT EXISTS (
         SELECT 1
-        FROM comparison_rates_v2 crs
+        FROM comparison_rates crs
         WHERE crs.type = 'light'
           AND crs.company <> t.company
           AND crs.invoice_month = t.invoice_month
           AND crs.invoice_year = t.invoice_year
+          AND crs.rate_mode <> 'Indexada'
           AND LOWER(crs.subrate_name::text) = LOWER(t.preferred_subrate::text)
       )
     ) AS f_fallback_no_preferred_match,
 
     (
-      cr.invoice_year = t.invoice_year
+      cr.rate_mode <> 'Indexada'
+      AND cr.invoice_year = t.invoice_year
       AND NOT EXISTS (
         SELECT 1
-        FROM comparison_rates_v2 cry
+        FROM comparison_rates cry
         WHERE cry.type = 'light'
           AND cry.company <> t.company
           AND cry.invoice_month = t.invoice_month
           AND cry.invoice_year = t.invoice_year
+          AND cry.rate_mode <> 'Indexada'
       )
     ) AS f_fallback_same_year,
 
@@ -83,12 +96,15 @@ candidates AS (
       OR cr.has_permanence = TRUE
       OR NOT EXISTS (
         SELECT 1
-        FROM comparison_rates_v2 crp
+        FROM comparison_rates crp
         WHERE crp.type = 'light'
           AND crp.company <> t.company
           AND (
-                (crp.invoice_month IS NULL AND crp.invoice_year IS NULL)
-             OR (crp.invoice_month = t.invoice_month AND crp.invoice_year = t.invoice_year)
+                -- Tarifas indexadas: sin filtro de mes/año
+                (crp.rate_mode = 'Indexada')
+             OR -- Tarifas fijas: con filtro de mes/año
+                ((crp.invoice_month IS NULL AND crp.invoice_year IS NULL)
+                 OR (crp.invoice_month = t.invoice_month AND crp.invoice_year = t.invoice_year))
           )
           AND (t.region IS NULL OR t.region = ANY (crp.region))
           AND (
@@ -103,38 +119,55 @@ candidates AS (
     -- Resultado global
     (
       (
-        (cr.invoice_month = t.invoice_month AND cr.invoice_year = t.invoice_year
+        -- 1️⃣ Tarifas indexadas: solo filtra por subrate, sin mes/año
+        (cr.rate_mode = 'Indexada'
           AND (
             t.preferred_subrate IS NULL
             OR t.preferred_subrate = ''
             OR LOWER(cr.subrate_name::text) = LOWER(t.preferred_subrate::text)
           )
         )
+        -- 2️⃣ Tarifas fijas: coincidencia exacta de mes/año + subrate
+        OR (cr.rate_mode <> 'Indexada'
+            AND ((cr.invoice_month = t.invoice_month AND cr.invoice_year = t.invoice_year)
+              AND (
+                t.preferred_subrate IS NULL
+                OR t.preferred_subrate = ''
+                OR LOWER(cr.subrate_name::text) = LOWER(t.preferred_subrate::text)
+              )
+            )
+          )
+        -- 3️⃣ Tarifas genéricas (sin periodo definido)
         OR (cr.invoice_month IS NULL AND cr.invoice_year IS NULL)
+        -- 4️⃣ Fallback: si no hay tarifas del mes/año con esa preferred_subrate → permitir todas del mes/año (solo fijas)
         OR (
-          cr.invoice_month = t.invoice_month
-          AND cr.invoice_year = t.invoice_year
-          AND NOT EXISTS (
-            SELECT 1
-            FROM comparison_rates_v2 crs
-            WHERE crs.type = 'light'
-              AND crs.company <> t.company
-              AND crs.invoice_month = t.invoice_month
-              AND crs.invoice_year = t.invoice_year
-              AND LOWER(crs.subrate_name::text) = LOWER(t.preferred_subrate::text)
+            cr.rate_mode <> 'Indexada'
+            AND (cr.invoice_month = t.invoice_month AND cr.invoice_year = t.invoice_year)
+            AND NOT EXISTS (
+                SELECT 1
+                FROM comparison_rates crs
+                WHERE crs.type = 'light'
+                  AND crs.company <> t.company
+                  AND crs.invoice_month = t.invoice_month
+                  AND crs.invoice_year = t.invoice_year
+                  AND crs.rate_mode <> 'Indexada'
+                  AND LOWER(crs.subrate_name::text) = LOWER(t.preferred_subrate::text)
+            )
           )
-        )
+        -- 5️⃣ Fallback: si no hay tarifas del mes exacto → permitir cualquiera del mismo año (solo fijas)
         OR (
-          cr.invoice_year = t.invoice_year
-          AND NOT EXISTS (
-            SELECT 1
-            FROM comparison_rates_v2 cry
-            WHERE cry.type = 'light'
-              AND cry.company <> t.company
-              AND cry.invoice_month = t.invoice_month
-              AND cry.invoice_year = t.invoice_year
+            cr.rate_mode <> 'Indexada'
+            AND cr.invoice_year = t.invoice_year
+            AND NOT EXISTS (
+                SELECT 1
+                FROM comparison_rates cry
+                WHERE cry.type = 'light'
+                  AND cry.company <> t.company
+                  AND cry.invoice_month = t.invoice_month
+                  AND cry.invoice_year = t.invoice_year
+                  AND cry.rate_mode <> 'Indexada'
+            )
           )
-        )
       )
       AND (t.region IS NULL OR t.region = ANY (cr.region))
       AND (
@@ -147,12 +180,15 @@ candidates AS (
         OR cr.has_permanence = TRUE
         OR NOT EXISTS (
           SELECT 1
-          FROM comparison_rates_v2 crp
+          FROM comparison_rates crp
           WHERE crp.type = 'light'
             AND crp.company <> t.company
             AND (
-                  (crp.invoice_month IS NULL AND crp.invoice_year IS NULL)
-               OR (crp.invoice_month = t.invoice_month AND crp.invoice_year = t.invoice_year)
+                  -- Tarifas indexadas: sin filtro de mes/año
+                  (crp.rate_mode = 'Indexada')
+               OR -- Tarifas fijas: con filtro de mes/año
+                  ((crp.invoice_month IS NULL AND crp.invoice_year IS NULL)
+                   OR (crp.invoice_month = t.invoice_month AND crp.invoice_year = t.invoice_year))
             )
             AND (t.region IS NULL OR t.region = ANY (crp.region))
             AND (
@@ -166,7 +202,7 @@ candidates AS (
     ) AS passes_all_filters
 
   FROM target t
-  JOIN comparison_rates_v2 cr
+  JOIN comparison_rates cr
     ON cr.type = 'light'
    AND cr.company <> t.company
    AND cr.deleted = FALSE
@@ -186,7 +222,8 @@ SELECT
 FROM candidates c
 CROSS JOIN LATERAL (
   VALUES
-    ('f_exact_period', c.f_exact_period),
+    ('f_indexada_subrate', c.f_indexada_subrate),
+    ('f_fija_period_subrate', c.f_fija_period_subrate),
     ('f_generic_period', c.f_generic_period),
     ('f_fallback_no_preferred_match', c.f_fallback_no_preferred_match),
     ('f_fallback_same_year', c.f_fallback_same_year),
