@@ -1,7 +1,3 @@
--- Nota: Postgres no permite cambiar la query de una materialized view "in-place".
--- Este script la reconstruye con un swap usando ALTER MATERIALIZED VIEW (sin dropear la MV actual).
--- Ojo: si tienes otras vistas que dependen de esta MV por OID, el swap por rename NO las redirige automáticamente.
-
 drop materialized view if exists public.mat_comparisons_historic;
 
 create materialized view public.mat_comparisons_historic as
@@ -103,17 +99,4 @@ from
   left join users u on u.user_id = coalesce(b.advisor_id, v.advisor_id)
 with no data;
 
-refresh materialized view public.mat_comparisons_historic__new;
-
-do $$
-begin
-  if to_regclass('public.mat_comparisons_historic__old') is not null then
-    execute 'drop materialized view public.mat_comparisons_historic__old';
-  end if;
-
-  if to_regclass('public.mat_comparisons_historic') is not null then
-    execute 'alter materialized view public.mat_comparisons_historic rename to mat_comparisons_historic__old';
-  end if;
-
-  execute 'alter materialized view public.mat_comparisons_historic__new rename to mat_comparisons_historic';
-end $$;
+refresh materialized view public.mat_comparisons_historic;

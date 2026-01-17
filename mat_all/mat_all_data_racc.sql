@@ -32,7 +32,8 @@ select
   mat_all_data.comparison_id,
   mat_all_data.comparison_created_at,
   mat_all_data.deleted,
-  mat_all_data.deleted_reason
+  mat_all_data.deleted_reason,
+  mat_all_data.deleted_at
 from
   mat_all_data
 where

@@ -77,7 +77,8 @@ select
   lcc.comparison_id,
   lcc.comparison_created_at,
   c.deleted,
-  null::text as deleted_reason
+  c.deleted_reason,
+  c.deleted_at
 from
   _contracts_detailed c
   join users u on u.user_id = c.advisor_id
@@ -118,7 +119,8 @@ select
   c.id as comparison_id,
   c.created_at as comparison_created_at,
   c.deleted,
-  null::text as deleted_reason
+  c.deleted_reason,
+  c.deleted_at
 from
   mat_comparisons_historic c
   left join _valuations_detailed v on v.id = c.valuation_id
@@ -158,7 +160,8 @@ select
   null::uuid as comparison_id,
   null::timestamp without time zone as comparison_created_at,
   v.deleted,
-  v.deleted_reason
+  v.deleted_reason,
+  v.deleted_at
 from
   _valuations_detailed v
   left join users u on u.user_id = v.advisor_id
@@ -197,7 +200,8 @@ select
   lc.comparison_id,
   lc.comparison_created_at,
   null::boolean as deleted,
-  null::text as deleted_reason
+  null::text as deleted_reason,
+  null::timestamp without time zone as deleted_at
 from
   _clients_detailed cl
   left join users u on u.user_id = cl.advisor_id

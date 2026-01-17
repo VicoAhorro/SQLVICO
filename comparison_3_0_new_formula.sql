@@ -67,10 +67,12 @@ WITH calculated_prices_3_0 AS (
     0::real AS meter_rental,
     c30.preferred_subrate,
     c30.rate_i_have,
+    c30.term_month_i_want,
 
     cr.company      AS new_company,
     cr.rate_name    AS new_rate_name,
     cr.subrate_name AS new_subrate_name,
+    cr.term_month,
 
     cr.price_pp1, cr.price_pp2, cr.price_pp3, cr.price_pp4, cr.price_pp5, cr.price_pp6,
     cr.price_cp1, cr.price_cp2, cr.price_cp3, cr.price_cp4, cr.price_cp5, cr.price_cp6,

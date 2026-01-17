@@ -1,6 +1,6 @@
 -- DROP VIEW IF EXISTS public._comparisons_detailed_3_0;
 
-CREATE OR REPLACE VIEW public._comparisons_detailed_3_0 AS
+CREATE OR REPLACE VIEW public._comparisons_detailed_3_0_deprecated AS
 WITH calculated_prices_3_0 AS (
   SELECT
     c30.id,
