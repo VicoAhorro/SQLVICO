@@ -131,6 +131,7 @@ WITH calculated_prices_3_0 AS (
 
     c30.deleted,
     c30.deleted_reason,
+    c30.deleted_at,
     cr.id AS new_rate_id,
     COALESCE(c30.max_power,0) AS max_power,
 
@@ -523,6 +524,7 @@ SELECT DISTINCT
   rc.type_filter,
   rc.deleted,
   rc.deleted_reason,
+  rc.deleted_at,
   rc.new_rate_id,
   rc.max_power,
   rc.speed_fiber,

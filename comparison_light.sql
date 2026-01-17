@@ -38,6 +38,7 @@ base AS (
     cl.temp_client_last_name,
     cl.deleted,
     cl.deleted_reason,
+    cl.deleted_at,
     cl.preferred_subrate,
     cl.wants_permanence,
 
@@ -504,6 +505,7 @@ SELECT DISTINCT
 
   rc.deleted,
   rc.deleted_reason,
+  rc.deleted_at,
   rc.new_rate_id,
   COALESCE(rc.max_power,0)::real AS max_power,
 

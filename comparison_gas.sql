@@ -108,6 +108,7 @@ calculated_prices_gas AS (
 
     cg.deleted,
     cg.deleted_reason,
+    cg.deleted_at,
     cr.id                                          AS new_rate_id,
     0                                             AS max_power,
     0                                             AS speed_fiber,
@@ -447,6 +448,7 @@ SELECT
   rc.type_filter,
   rc.deleted,
   rc.deleted_reason,
+  rc.deleted_at,
   rc.new_rate_id,
   rc.max_power,
   rc.speed_fiber,

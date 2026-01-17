@@ -19,7 +19,8 @@ with
       cl.pdf_invoice,
       'light'::text as source,
       cl.deleted,
-      cl.deleted_reason
+      cl.deleted_reason,
+      cl.deleted_at
     from
       comparison_light cl
     union all
@@ -35,7 +36,8 @@ with
       c30.pdf_invoice,
       '3_0'::text as source,
       c30.deleted,
-      c30.deleted_reason
+      c30.deleted_reason,
+      c30.deleted_at
     from
       comparison_3_0 c30
     union all
@@ -51,7 +53,8 @@ with
       cg.pdf_invoice,
       'gas'::text as source,
       cg.deleted,
-      cg.deleted_reason
+      cg.deleted_reason,
+      cg.deleted_at
     from
       comparison_gas cg
     union all
@@ -67,7 +70,8 @@ with
       cp.pdf_invoice,
       'phone'::text as source,
       cp.deleted,
-      cp.deleted_reason
+      cp.deleted_reason,
+      cp.deleted_at
     from
       comparison_phone cp
   )
@@ -91,7 +95,8 @@ select
   b.pdf_invoice,
   b.source,
   b.deleted,
-  b.deleted_reason
+  b.deleted_reason,
+  b.deleted_at
 from
   base b
   left join _valuations_detailed v on v.id = b.valuation_id

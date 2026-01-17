@@ -37,3 +37,6 @@ from
   mat_all_data
 where
   mat_all_data.tenant = 1;
+
+CREATE UNIQUE INDEX mat_all_data_racc_unique_idx
+ON public.mat_all_data_racc (source, id);

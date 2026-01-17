@@ -204,3 +204,6 @@ from
   left join latest_val lv on lv.client_email = cl.email
   and lv.advisor_id = cl.advisor_id
   left join latest_cmp lc on lc.valuation_id = lv.valuation_id;
+
+CREATE UNIQUE INDEX mat_all_data_unique_idx
+ON public.mat_all_data (source, id);

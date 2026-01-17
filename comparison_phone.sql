@@ -102,6 +102,7 @@ ranked_phone AS (
     ARRAY['phone','All']                  AS type_filter,
     cp.deleted,
     cp.deleted_reason,
+    cp.deleted_at,
     rc_1.rate_id     AS new_rate_id,
     0 AS max_power,
 
@@ -127,7 +128,9 @@ ranked_phone AS (
       PARTITION BY cp.id
       ORDER BY ((cp.current_total_invoice*12)::double precision - rc_1.total_anual_price) + rc_1.total_crs*4 DESC
     ) AS rank,
-    0
+    0,
+    cp.term_month,
+    cp.term_month_i_want
   FROM comparison_phone cp
   JOIN recursive_combinations rc_1
     ON rc_1.fibra_mb   >= cp.speed_fiber
@@ -228,6 +231,7 @@ SELECT DISTINCT
   rp.type_filter,
   rp.deleted,
   rp.deleted_reason,
+  rp.deleted_at,
   rp.new_rate_id,
   rp.max_power,
   rp.speed_fiber,
@@ -275,7 +279,9 @@ SELECT DISTINCT
   false as has_permanence,
   NULL::rate_mode_type AS rate_mode,
   0::real AS total_excedentes_precio,
-  null::rate_mode_type AS rate_i_have
+  null::rate_mode_type AS rate_i_have,
+  rp.term_month,
+  rp.term_month_i_want
   
 FROM ranked_phone rp
 LEFT JOIN _users_supervisors us ON rp.advisor_id = us.user_id
