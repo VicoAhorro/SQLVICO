@@ -169,32 +169,9 @@ base AS (
   AND (cr.cif IS NULL OR cr.cif = cl.cif)
 
   -- =========================
-  -- 🔸 Fallback de permanencia coherente
+  -- 🔸 Filtro de permanencia (maneja NULL)
   -- =========================
-  AND (
-      cl.wants_permanence IS NOT TRUE
-      OR cr.has_permanence = TRUE
-      OR NOT EXISTS (
-          SELECT 1
-          FROM comparison_rates crp
-          WHERE crp.type = 'light'
-            AND crp.company <> cl.company
-            AND (
-                  -- Tarifas indexadas: sin filtro de mes/año
-                  (crp.rate_mode = 'Indexada')
-               OR -- Tarifas fijas: con filtro de mes/año
-                  ((crp.invoice_month IS NULL AND crp.invoice_year IS NULL)
-                   OR (crp.invoice_month = cl.invoice_month AND crp.invoice_year = cl.invoice_year))
-            )
-            AND (cl.region IS NULL OR cl.region = ANY (crp.region))
-            AND (
-                  (cl.selfconsumption = TRUE AND COALESCE(crp.selfconsumption, FALSE) = TRUE)
-                  OR (cl.selfconsumption IS DISTINCT FROM TRUE AND crp.selfconsumption IS DISTINCT FROM TRUE)
-                )
-            AND (crp.cif IS NULL OR crp.cif = cl.cif)
-            AND crp.has_permanence = TRUE
-      )
-  )
+  AND (cl.wants_permanence IS NULL OR cr.has_permanence = cl.wants_permanence)
   WHERE cl.valuation_id is null
   AND cl.deleted = false
   ),

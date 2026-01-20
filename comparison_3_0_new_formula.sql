@@ -207,6 +207,10 @@ WITH calculated_prices_3_0 AS (
           )
           AND (cr.cif IS NULL OR cr.cif = c30.cif)
           AND (c30.region IS NULL OR c30.region = ANY (cr.region))
+          AND (
+            c30.term_month_i_want IS NULL 
+            OR cr.term_month <= c30.term_month_i_want
+          )
         )
       )
   ) cr ON TRUE
