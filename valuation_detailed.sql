@@ -79,7 +79,8 @@ select distinct
     cl.name,
     cl.last_name,
     cl."DNI",
-    cl.phone_number
+    cl.phone_number,
+    v.temp_client_phone
   ) as search,
   to_char(v.created_at, 'MM'::text) as created_month,
   to_char(v.created_at, 'YYYY'::text) as created_year,
@@ -90,7 +91,8 @@ select distinct
   v.notificaciones,
   COALESCE(cr.has_permanence, false) as wants_permanence,
   comp.wants_permanence as original_wants_permanence,
-  v.deleted_at
+  v.deleted_at,
+  v.temp_client_phone
 from
   clients_valuations v
   left join _users_supervisors us on v.advisor_id = us.user_id

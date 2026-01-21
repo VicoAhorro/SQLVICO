@@ -214,6 +214,16 @@ WITH calculated_prices_3_0 AS (
           AND (c30.region IS NULL OR c30.region = ANY (cr.region))
           AND (c30.wants_gdo = false OR cr.has_gdo = true)
           AND (
+            c30.excluded_company_ids IS NULL
+            OR NOT (
+              cr.company IN (
+                SELECT c_ex.name
+                FROM companies c_ex
+                WHERE c_ex.id = ANY (c30.excluded_company_ids)
+              )
+            )
+          )
+          AND (
             c30.term_month_i_want IS NULL 
             OR cr.term_month <= c30.term_month_i_want
           )
@@ -412,7 +422,6 @@ filtered_prices AS (
     uep.*,
     u.tenant,
     c30.wants_permanence,
-    c30.wants_gdo,
     c30.region AS c30_region,
     c30.cif AS c30_cif
   FROM unified_extended_prices uep
