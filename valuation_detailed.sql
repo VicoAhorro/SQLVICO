@@ -80,7 +80,7 @@ select distinct
     cl.last_name,
     cl."DNI",
     cl.phone_number,
-    v.temp_client_phone
+    v.temp_mobile_number
   ) as search,
   to_char(v.created_at, 'MM'::text) as created_month,
   to_char(v.created_at, 'YYYY'::text) as created_year,
