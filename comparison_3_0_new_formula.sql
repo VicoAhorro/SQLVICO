@@ -68,6 +68,9 @@ WITH calculated_prices_3_0 AS (
     c30.preferred_subrate,
     c30.rate_i_have,
     c30.term_month_i_want,
+    c30.temp_client_phone,
+    c30.wants_gdo,
+    c30.excluded_company_ids,
 
     cr.company      AS new_company,
     cr.rate_name    AS new_rate_name,
@@ -78,6 +81,7 @@ WITH calculated_prices_3_0 AS (
     cr.price_cp1, cr.price_cp2, cr.price_cp3, cr.price_cp4, cr.price_cp5, cr.price_cp6,
     cr.price_surpluses,
     cr.has_permanence,
+    cr.has_gdo,
     cr.rate_mode,
     0::real as total_excedentes_precio,
 
@@ -203,10 +207,12 @@ WITH calculated_prices_3_0 AS (
                 )
                 AND (c30.region IS NULL OR c30.region = ANY (crp.region))
                 AND crp.has_permanence = TRUE
+                AND (c30.wants_gdo = false OR crp.has_gdo = true)
             )
           )
           AND (cr.cif IS NULL OR cr.cif = c30.cif)
           AND (c30.region IS NULL OR c30.region = ANY (cr.region))
+          AND (c30.wants_gdo = false OR cr.has_gdo = true)
           AND (
             c30.term_month_i_want IS NULL 
             OR cr.term_month <= c30.term_month_i_want
@@ -406,6 +412,7 @@ filtered_prices AS (
     uep.*,
     u.tenant,
     c30.wants_permanence,
+    c30.wants_gdo,
     c30.region AS c30_region,
     c30.cif AS c30_cif
   FROM unified_extended_prices uep
@@ -662,7 +669,10 @@ SELECT DISTINCT
   rc.total_excedentes_precio,
   rc.rate_i_have,
   rc.term_month,
-  rc.term_month_i_want
+  rc.term_month_i_want,
+  rc.excluded_company_ids,
+  rc.wants_gdo,
+  rc.temp_client_phone
 
 FROM all_comparisons_ranked rc
 LEFT JOIN _users_supervisors us ON rc.advisor_id = us.user_id

@@ -66,6 +66,9 @@ base AS (
     cl.cif,
     cl.region,
     cl.term_month_i_want,
+    cl.excluded_company_ids,
+    cl.wants_gdo,
+    cl.temp_client_phone,
 
     -- Candidata de tarifas nuevas
     cr.id          AS new_rate_id,
@@ -95,10 +98,12 @@ base AS (
   AND (cr.tenant_id IS NULL 
         OR u.tenant = ANY(cr.tenant_id)
       )
+  LEFT JOIN companies c
+  ON c.name = cr.company
   -- =========================
   -- 🔸 Filtro principal con fallback de mes/año + subrate
   -- =========================
-  AND (
+  WHERE (
       -- 1️⃣ Tarifas indexadas: solo filtra por subrate, sin mes/año
       (cr.rate_mode = 'Indexada'
         AND (
@@ -159,6 +164,18 @@ base AS (
   -- =========================
   AND (cl.region IS NULL OR cl.region = ANY (cr.region))
 
+  -- -- ✅ Excluir companias seleccionadas (si hay ids)
+  AND (
+    cl.excluded_company_ids IS NULL 
+    OR NOT (
+      cr.company IN (
+        SELECT c_ex.name 
+        FROM companies c_ex 
+        WHERE c_ex.id = ANY (cl.excluded_company_ids)
+      )
+    )
+  )
+
   -- ✅ Autoconsumo simétrico (solo coinciden si ambos tienen el mismo valor lógico)
   AND (
     (cl.selfconsumption = TRUE AND COALESCE(cr.selfconsumption, FALSE) = TRUE)
@@ -172,7 +189,11 @@ base AS (
   -- 🔸 Filtro de permanencia (maneja NULL)
   -- =========================
   AND (cl.wants_permanence IS NULL OR cr.has_permanence = cl.wants_permanence)
-  WHERE cl.valuation_id is null
+  
+  -- ✅ Filtro GDO (solo si el cliente lo solicita)
+  AND (cl.wants_gdo = false OR cr.has_gdo = true)
+  
+  AND cl.valuation_id is null
   AND cl.deleted = false
   ),
 -- ====== Metrizaciones mensuales y totales base ======
@@ -567,7 +588,10 @@ SELECT DISTINCT
   rc.total_excedentes_precio,
   null::rate_mode_type AS rate_i_have,
   rc.term_month,
-  rc.term_month_i_want
+  rc.term_month_i_want,
+  rc.excluded_company_ids,
+  rc.wants_gdo,
+  rc.temp_client_phone
 
 FROM with_advisor rc
 LEFT JOIN users u ON u.user_id = rc.advisor_id

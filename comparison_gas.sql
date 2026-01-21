@@ -74,6 +74,9 @@ calculated_prices_gas AS (
     cg.preferred_subrate,
     cg.wants_permanence,
     cg.term_month_i_want,
+    cg.excluded_company_ids,
+    cg.wants_gdo,
+    cg.temp_client_phone,
 
     -- Nueva tarifa (cr)
     cr.company                                   AS new_company,
@@ -606,7 +609,10 @@ SELECT
   rc.total_excedentes_precio,
   NULL::rate_mode_type AS rate_i_have,
   rc.term_month,
-  rc.term_month_i_want
+  rc.term_month_i_want,
+  rc.excluded_company_ids,
+  rc.wants_gdo,
+  rc.temp_client_phone
 
 FROM all_comparisons_ranked rc
 LEFT JOIN _users_supervisors us ON rc.advisor_id = us.user_id
