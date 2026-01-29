@@ -17,9 +17,15 @@ base_rates AS (
     crp.excluded_companies,
     crp.rate            AS rate_pack,
     crp.type            AS rate_type,
-    crp.allow_landline
+    crp.allow_landline,
+    -- Nuevos campos para filtros de light
+    crp.tenant_id,
+    crp.region,
+    crp.cif,
+    crp.has_permanence
   FROM comparison_rates_phone crp
   WHERE crp.type <> 'Adicional'
+    AND crp.deleted = FALSE
 ),
 recursive_combinations AS (
   SELECT * FROM base_rates
@@ -38,13 +44,18 @@ recursive_combinations AS (
     rc_1.excluded_companies,
     concat_ws(', ', rc_1.rate_pack, al.rate) AS rate_pack,
     rc_1.rate_type,
-    rc_1.allow_landline
+    rc_1.allow_landline,
+    rc_1.tenant_id,
+    rc_1.region,
+    rc_1.cif,
+    rc_1.has_permanence
   FROM recursive_combinations rc_1
   JOIN comparison_rates_phone al
     ON al.type = 'Adicional'
    AND al.company = rc_1.rate_company
    AND (al.is_unique = FALSE OR NOT (al.rate = ANY(string_to_array(rc_1.rate_pack, ', '))))
    AND rc_1.total_lines < (SELECT max(cp.mobile_lines + 2) FROM comparison_phone cp)
+   AND al.deleted = FALSE
 ),
 ranked_phone AS (
   SELECT
@@ -136,7 +147,30 @@ ranked_phone AS (
     ON rc_1.fibra_mb   >= cp.speed_fiber
    AND rc_1.total_lines BETWEEN cp.mobile_lines AND (cp.mobile_lines + 2)
    AND rc_1.rate_type   = cp.rate_type
-   AND rc_1.total_gb   >= cp.mobile_total_gb
+   AND rc_1.total_gb    >= cp.mobile_total_gb
+   
+   -- Filtros estilo "light"
+   AND rc_1.rate_company <> cp.company -- No mostrar la misma compañía
+   AND (
+     rc_1.tenant_id IS NULL 
+     OR (SELECT u.tenant FROM users u WHERE u.user_id = cp.advisor_id) = ANY(rc_1.tenant_id)
+   ) -- Filtro tenant
+   AND (cp.region IS NULL OR cp.region = ANY (rc_1.region)) -- Filtro región
+   AND (rc_1.cif IS NULL OR rc_1.cif = cp.cif) -- Filtro CIF
+   AND (cp.wants_permanence IS NULL OR rc_1.has_permanence = cp.wants_permanence) -- Filtro permanencia
+   
+   -- Excluidas por ID (si hay ids)
+   AND (
+    cp.excluded_company_ids IS NULL 
+    OR NOT (
+      rc_1.rate_company IN (
+        SELECT c_ex.name 
+        FROM companies c_ex 
+        WHERE c_ex.id = ANY (cp.excluded_company_ids)
+      )
+    )
+   )
+
    AND (rc_1.excluded_companies IS NULL
         OR NOT EXISTS (
           SELECT 1

@@ -189,6 +189,7 @@ base AS (
   -- 🔸 Filtro de permanencia (maneja NULL)
   -- =========================
   AND (cl.wants_permanence IS NULL OR cr.has_permanence = cl.wants_permanence)
+  AND (cl.wants_permanence IS NOT TRUE OR cl.term_month_i_want IS NULL OR cr.term_month <= cl.term_month_i_want)
   
   -- ✅ Filtro GDO (solo si el cliente lo solicita)
   AND (cl.wants_gdo = false OR cr.has_gdo = true)
