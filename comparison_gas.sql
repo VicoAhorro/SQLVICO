@@ -204,6 +204,18 @@ calculated_prices_gas AS (
  )
  AND (cg.region IS NULL OR cg.region = ANY (cr.region))
 
+  -- ✅ Excluir companias seleccionadas (si hay ids)
+  AND (
+    cg.excluded_company_ids IS NULL 
+    OR NOT (
+      cr.company IN (
+        SELECT c_ex.name 
+        FROM companies c_ex 
+        WHERE c_ex.id = ANY (cg.excluded_company_ids)
+      )
+    )
+  )
+
  where cg.valuation_id is null
 ),
 unified_calculated_prices AS (
