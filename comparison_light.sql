@@ -104,8 +104,8 @@ base AS (
   -- 🔸 Filtro principal con fallback de mes/año + subrate
   -- =========================
   WHERE (
-      -- 1️⃣ Tarifas indexadas: solo filtra por subrate, sin mes/año
-      (cr.rate_mode = 'Indexada'
+      -- 1️⃣ Tarifas fijas: solo filtra por subrate, sin mes/año
+      (cr.rate_mode <> 'Indexada'
         AND (
             cl.preferred_subrate IS NULL
             OR cl.preferred_subrate = ''
@@ -113,8 +113,8 @@ base AS (
         )
       )
 
-      -- 2️⃣ Tarifas fijas: coincidencia exacta de mes/año + subrate
-      OR (cr.rate_mode <> 'Indexada'
+      -- 2️⃣ Tarifas indexadas: coincidencia exacta de mes/año + subrate
+      OR (cr.rate_mode = 'Indexada'
           AND ((cr.invoice_month = cl.invoice_month AND cr.invoice_year = cl.invoice_year)
             AND (
                 cl.preferred_subrate IS NULL
@@ -127,9 +127,9 @@ base AS (
       -- 3️⃣ Tarifas genéricas (sin periodo definido)
       OR (cr.invoice_month IS NULL AND cr.invoice_year IS NULL)
 
-      -- 4️⃣ Fallback: si no hay tarifas del mes/año con esa preferred_subrate → permitir todas del mes/año (solo fijas)
+      -- 4️⃣ Fallback: si no hay tarifas del mes/año con esa preferred_subrate → permitir todas del mes/año (solo indexadas)
       OR (
-          cr.rate_mode <> 'Indexada'
+          cr.rate_mode = 'Indexada'
           AND (cr.invoice_month = cl.invoice_month AND cr.invoice_year = cl.invoice_year)
           AND NOT EXISTS (
               SELECT 1
@@ -138,14 +138,14 @@ base AS (
                 AND crs.company <> cl.company
                 AND crs.invoice_month = cl.invoice_month
                 AND crs.invoice_year = cl.invoice_year
-                AND crs.rate_mode <> 'Indexada'
+                AND crs.rate_mode = 'Indexada'
                 AND LOWER(crs.subrate_name::text) = LOWER(cl.preferred_subrate::text)
           )
       )
 
-      -- 5️⃣ Fallback: si no hay tarifas del mes exacto → permitir cualquiera del mismo año (solo fijas)
+      -- 5️⃣ Fallback: si no hay tarifas del mes exacto → permitir cualquiera del mismo año (solo indexadas)
       OR (
-          cr.rate_mode <> 'Indexada'
+          cr.rate_mode = 'Indexada'
           AND cr.invoice_year = cl.invoice_year
           AND NOT EXISTS (
               SELECT 1
@@ -154,7 +154,7 @@ base AS (
                 AND cry.company <> cl.company
                 AND cry.invoice_month = cl.invoice_month
                 AND cry.invoice_year = cl.invoice_year
-                AND cry.rate_mode <> 'Indexada'
+                AND cry.rate_mode = 'Indexada'
           )
       )
   )
