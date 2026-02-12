@@ -92,7 +92,8 @@ select distinct
   COALESCE(cr.has_permanence, false) as wants_permanence,
   comp.wants_permanence as original_wants_permanence,
   v.deleted_at,
-  v.temp_client_phone
+  v.temp_client_phone,
+  v.new_total_yearly_price_with_vat
 from
   clients_valuations v
   left join _users_supervisors us on v.advisor_id = us.user_id
