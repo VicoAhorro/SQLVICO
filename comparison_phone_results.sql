@@ -1,6 +1,6 @@
 create table public.comparison_phone_results (
   id uuid not null default gen_random_uuid (),
-  comparison_id uuid not null,
+  comparison_phone_id uuid not null,
   created_at timestamp with time zone not null default now(),
   advisor_id uuid null,
   client_email text null,
@@ -27,6 +27,8 @@ create table public.comparison_phone_results (
   created_month text null,
   created_year text null,
   inserted_at timestamp with time zone not null default now(),
+  comparison_id uuid null,
   constraint comparison_phone_results_pkey primary key (id),
-  constraint comparison_phone_results_comparison_id_fkey foreign KEY (comparison_id) references comparison_phone (id)
+  constraint comparison_phone_results_comparison_id_fkey foreign KEY (comparison_id) references comparisons (id) on update CASCADE on delete CASCADE,
+  constraint comparison_phone_results_comparison_phone_id_fkey foreign KEY (comparison_phone_id) references comparison_phone (id)
 ) TABLESPACE pg_default;

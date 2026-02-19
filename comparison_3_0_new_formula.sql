@@ -1,4 +1,3 @@
-DROP VIEW IF EXISTS public._comparisons_detailed_3_0;
 
 CREATE OR REPLACE VIEW public._comparisons_detailed_3_0 AS
 WITH calculated_prices_3_0 AS (
@@ -151,7 +150,8 @@ WITH calculated_prices_3_0 AS (
 
     FALSE AS tarifa_plana,
     c30.cif,
-    c30.region
+    c30.region,
+    c30.comparison_id
     
   FROM (SELECT * FROM comparison_3_0 WHERE valuation_id IS NULL AND (deleted IS NULL OR deleted = FALSE)) c30
   LEFT JOIN users u 
@@ -683,7 +683,9 @@ SELECT DISTINCT
   rc.term_month_i_want,
   rc.excluded_company_ids,
   rc.wants_gdo,
-  rc.temp_client_phone
+  rc.temp_client_phone,
+  rc.comparison_id,
+  rc.wants_permanence
 
 FROM all_comparisons_ranked rc
 LEFT JOIN _users_supervisors_all us ON rc.advisor_id = us.user_id

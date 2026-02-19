@@ -86,7 +86,8 @@ base AS (
     cr.daily_maintenance_with_vat,
     cr.has_permanence,
     cr.rate_mode,
-    cl.total_excedentes_precio
+    cl.total_excedentes_precio,
+    cl.comparison_id
 
   FROM (SELECT * FROM comparison_light WHERE valuation_id IS NULL AND deleted = false) cl
   LEFT JOIN users u
@@ -584,7 +585,9 @@ SELECT DISTINCT
   rc.term_month_i_want,
   rc.excluded_company_ids,
   rc.wants_gdo,
-  rc.temp_client_phone
+  rc.temp_client_phone,
+  rc.comparison_id,
+  rc.wants_permanence
 
 FROM with_advisor rc
 WHERE rc.rank = 1;
