@@ -130,7 +130,7 @@ calculated_prices_gas AS (
     cr.rate_mode,
     0                                             AS total_excedentes_precio
 
-  FROM comparison_gas cg
+  FROM (SELECT * FROM comparison_gas WHERE valuation_id IS NULL AND deleted = false) cg
   LEFT JOIN users u 
   ON u.user_id = cg.advisor_id
   LEFT JOIN comparison_rates cr
@@ -216,7 +216,6 @@ calculated_prices_gas AS (
     )
   )
 
- where cg.valuation_id is null
 ),
 unified_calculated_prices AS (
   SELECT * FROM calculated_prices_gas
@@ -630,5 +629,4 @@ FROM all_comparisons_ranked rc
 LEFT JOIN _users_supervisors us ON rc.advisor_id = us.user_id
 LEFT JOIN users u             ON u.user_id = rc.advisor_id
 WHERE rc.rank = 1
-  AND (rc.deleted IS NULL OR rc.deleted = FALSE)
   AND rc.type = 'gas'

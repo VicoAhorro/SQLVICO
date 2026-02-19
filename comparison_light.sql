@@ -88,7 +88,7 @@ base AS (
     cr.rate_mode,
     cl.total_excedentes_precio
 
-  FROM comparison_light cl
+  FROM (SELECT * FROM comparison_light WHERE valuation_id IS NULL AND deleted = false) cl
   LEFT JOIN users u
   ON u.user_id = cl.advisor_id
   LEFT JOIN comparison_rates cr
@@ -193,9 +193,6 @@ base AS (
   
   -- ✅ Filtro GDO (solo si el cliente lo solicita)
   AND (cl.wants_gdo = false OR cr.has_gdo = true)
-  
-  AND cl.valuation_id is null
-  AND cl.deleted = false
   ),
 -- ====== Metrizaciones mensuales y totales base ======
 m_calc AS (
@@ -596,5 +593,4 @@ SELECT DISTINCT
 
 FROM with_advisor rc
 LEFT JOIN users u ON u.user_id = rc.advisor_id
-WHERE rc.rank = 1
-  AND (rc.deleted IS NULL OR rc.deleted = FALSE);
+WHERE rc.rank = 1;

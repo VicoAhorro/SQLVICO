@@ -153,7 +153,7 @@ WITH calculated_prices_3_0 AS (
     c30.cif,
     c30.region
     
-  FROM comparison_3_0 c30
+  FROM (SELECT * FROM comparison_3_0 WHERE valuation_id IS NULL AND (deleted IS NULL OR deleted = FALSE)) c30
   LEFT JOIN users u 
   ON u.user_id = c30.advisor_id
   LEFT JOIN LATERAL (
@@ -224,13 +224,13 @@ WITH calculated_prices_3_0 AS (
             )
           )
           AND (
-            c30.term_month_i_want IS NULL 
+            c30.wants_permanence IS NOT TRUE
+            OR c30.term_month_i_want IS NULL 
             OR cr.term_month <= c30.term_month_i_want
           )
         )
       )
   ) cr ON TRUE
-  WHERE (c30.deleted IS NULL OR c30.deleted = FALSE)
 ),
 unified_calculated_prices AS (
   SELECT * FROM calculated_prices_3_0
@@ -686,8 +686,7 @@ SELECT DISTINCT
 FROM all_comparisons_ranked rc
 LEFT JOIN _users_supervisors us ON rc.advisor_id = us.user_id
 LEFT JOIN users u               ON u.user_id     = rc.advisor_id
-WHERE (rc.deleted IS NULL OR rc.deleted = FALSE)
-  AND (
+WHERE (
     (rc.rate_i_want IS NULL AND rc.rank = 1)
     OR (rc.rate_i_want = 'Fija' AND rc.rate_mode = 'Fija' AND rc.rank_by_mode = 1)
     OR (rc.rate_i_want = 'Indexada' AND rc.rate_mode = 'Indexada' AND rc.rank_by_mode = 1)
