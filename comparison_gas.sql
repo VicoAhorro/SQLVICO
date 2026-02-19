@@ -592,16 +592,16 @@ SELECT
   us.supervisors,
   COALESCE(rc.temp_client_name, ''::text)      AS client_name,
   COALESCE(rc.temp_client_last_name, ''::text) AS client_last_name,
-  u.email                                      AS advisor_email,
-  u.name                               AS advisor_display_name,
-  ARRAY[COALESCE(u.email,''::text), 'All']     AS advisor_filter,
+  us.email                                     AS advisor_email,
+  us.display_name                              AS advisor_display_name,
+  ARRAY[COALESCE(us.email,''::text), 'All']    AS advisor_filter,
 
   -- (11) Derivados fecha y búsquedas
   EXTRACT(MONTH FROM rc.created_at)::text       AS created_month,
   EXTRACT(YEAR  FROM rc.created_at)::text       AS created_year,
   COALESCE(rc."CUPS",'') || ' ' ||
-  COALESCE(u.name,'') || ' ' ||
-  COALESCE(u.email,'') || ' ' ||
+  COALESCE(us.display_name,'') || ' ' ||
+  COALESCE(us.email,'') || ' ' ||
   LOWER(
     COALESCE(rc.client_email,'') || ' ' ||
     COALESCE(rc.company,'') || ' ' ||
@@ -626,7 +626,6 @@ SELECT
   rc.temp_client_phone
 
 FROM all_comparisons_ranked rc
-LEFT JOIN _users_supervisors us ON rc.advisor_id = us.user_id
-LEFT JOIN users u             ON u.user_id = rc.advisor_id
+LEFT JOIN _users_supervisors_all us ON rc.advisor_id = us.user_id
 WHERE rc.rank = 1
   AND rc.type = 'gas'

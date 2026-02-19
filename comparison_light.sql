@@ -379,16 +379,11 @@ ranked AS (
 with_advisor AS (
   SELECT
     r.*,
-    CASE
-      WHEN (SELECT u2.racc FROM users u2 WHERE u2.user_id = r.advisor_id LIMIT 1) = TRUE
-        THEN (SELECT array_cat(us.supervisors, array_agg(ur.user_id)) FROM users_racc ur)
-      ELSE us.supervisors
-    END                       AS supervisors,
-    u.email                   AS advisor_email,
-    u.name                    AS advisor_display_name
+    us.supervisors,
+    us.email AS advisor_email,
+    us.display_name AS advisor_display_name
   FROM ranked r
-  LEFT JOIN _users_supervisors us ON r.advisor_id = us.user_id
-  LEFT JOIN users u               ON u.user_id     = r.advisor_id
+  LEFT JOIN _users_supervisors_all us ON r.advisor_id = us.user_id
 )
 
 -- ====== SELECT FINAL ======
@@ -560,16 +555,16 @@ SELECT DISTINCT
   rc.supervisors,
   COALESCE(rc.temp_client_name,'')      AS client_name,
   COALESCE(rc.temp_client_last_name,'') AS client_last_name,
-  u.email                               AS advisor_email,
-  u.name                                AS advisor_display_name,
-  ARRAY[COALESCE(u.email,''::text),'All'] AS advisor_filter,
+  rc.advisor_email,
+  rc.advisor_display_name,
+  ARRAY[COALESCE(rc.advisor_email,''::text),'All'] AS advisor_filter,
 
   -- Derivados de fecha, búsqueda y filtros
   EXTRACT(MONTH FROM rc.created_at)::text AS created_month,
   EXTRACT(YEAR  FROM rc.created_at)::text AS created_year,
   COALESCE(rc."CUPS",'') || ' ' ||
-  COALESCE(u.name,'') || ' ' ||
-  COALESCE(u.email,'') || ' ' ||
+  COALESCE(rc.advisor_display_name,'') || ' ' ||
+  COALESCE(rc.advisor_email,'') || ' ' ||
   LOWER(
     COALESCE(rc.client_email,'') || ' ' ||
     COALESCE(rc.company,'') || ' ' ||
@@ -592,5 +587,4 @@ SELECT DISTINCT
   rc.temp_client_phone
 
 FROM with_advisor rc
-LEFT JOIN users u ON u.user_id = rc.advisor_id
 WHERE rc.rank = 1;

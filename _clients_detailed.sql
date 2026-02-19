@@ -1,4 +1,4 @@
-create view public._clients_detailed as
+create or replace view public._clients_detailed as
 select
   c.id,
   c.created_at,
@@ -19,26 +19,7 @@ select
   c.dni_repre as cif,
   c.cif_pdf,
   COALESCE(
-    case
-      when (
-        (
-          select
-            u2.racc
-          from
-            users u2
-          where
-            u2.user_id = c.advisor_id
-          limit
-            1
-        )
-      ) = true then (
-        select
-          array_cat(us.supervisors, array_agg(users_racc.user_id)) as array_cat
-        from
-          users_racc
-      )
-      else us.supervisors
-    end,
+    us.supervisors,
     array['0f317d06-93a8-4b2d-b18d-9a0264e1d288'::uuid]
   ) as supervisors,
   array[c.advisor_id::text, 'All'::text] as advisor_filter,
@@ -51,18 +32,10 @@ select
     c.phone_number
   ) as search,
   c.idioma as client_language,
-  (
-    select
-      u2.racc
-    from
-      users u2
-    where
-      u2.user_id = c.advisor_id
-    limit
-      1
-  ) as is_racc,
+  (ur.user_id is not null) as is_racc,
   c.apellido_representante
 from
-  clients c
-  left join _users_supervisors us on c.advisor_id = us.user_id
-  left join _clients_total_savings ts on c.email = ts.client_email;
+  public.clients c
+  left join public._users_supervisors_all us on c.advisor_id = us.user_id
+  left join public.users_racc ur on c.advisor_id = ur.user_id
+  left join public._clients_total_savings ts on c.email = ts.client_email;

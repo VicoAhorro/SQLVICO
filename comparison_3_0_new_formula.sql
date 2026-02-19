@@ -655,9 +655,9 @@ SELECT DISTINCT
   us.supervisors,
   COALESCE(rc.temp_client_name,'')      AS client_name,
   COALESCE(rc.temp_client_last_name,'') AS client_last_name,
-  u.email                               AS advisor_email,
-  u.name                                AS advisor_display_name,
-  ARRAY[COALESCE(u.email,''::text),'All'] AS advisor_filter,
+  us.email                               AS advisor_email,
+  us.display_name                        AS advisor_display_name,
+  ARRAY[COALESCE(us.email,''::text),'All'] AS advisor_filter,
   EXTRACT(MONTH FROM rc.created_at)::text AS created_month,
   EXTRACT(YEAR  FROM rc.created_at)::text AS created_year,
   LOWER(
@@ -666,7 +666,9 @@ SELECT DISTINCT
     COALESCE(rc.company,'') || ' ' ||
     COALESCE(rc.rate_name,'') || ' ' ||
     COALESCE(rc.temp_client_name,'') || ' ' ||
-    COALESCE(rc.temp_client_last_name,'')
+    COALESCE(rc.temp_client_last_name,'') || ' ' ||
+    COALESCE(us.display_name,'') || ' ' ||
+    COALESCE(us.email,'')
   ) AS search,
   ARRAY[COALESCE(rc.company,''::text),'All'] AS company_filter,
   rc.cif,
@@ -684,8 +686,7 @@ SELECT DISTINCT
   rc.temp_client_phone
 
 FROM all_comparisons_ranked rc
-LEFT JOIN _users_supervisors us ON rc.advisor_id = us.user_id
-LEFT JOIN users u               ON u.user_id     = rc.advisor_id
+LEFT JOIN _users_supervisors_all us ON rc.advisor_id = us.user_id
 WHERE (
     (rc.rate_i_want IS NULL AND rc.rank = 1)
     OR (rc.rate_i_want = 'Fija' AND rc.rate_mode = 'Fija' AND rc.rank_by_mode = 1)
