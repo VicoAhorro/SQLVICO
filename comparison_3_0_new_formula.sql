@@ -70,6 +70,7 @@ WITH calculated_prices_3_0 AS (
     c30.temp_client_phone,
     c30.wants_gdo,
     c30.excluded_company_ids,
+    c30.comparison_id,
 
     cr.company      AS new_company,
     cr.rate_name    AS new_rate_name,

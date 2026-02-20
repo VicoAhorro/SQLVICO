@@ -77,6 +77,7 @@ calculated_prices_gas AS (
     cg.excluded_company_ids,
     cg.wants_gdo,
     cg.temp_client_phone,
+    cg.comparison_id,
 
     -- Nueva tarifa (cr)
     cr.company                                   AS new_company,

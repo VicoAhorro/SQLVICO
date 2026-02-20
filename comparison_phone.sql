@@ -1,4 +1,4 @@
-create view public._comparisons_detailed_phone as
+create or replace view public._comparisons_detailed_phone as
 select distinct
   rp.id,
   rp.created_at::timestamp without time zone as created_at,
@@ -146,7 +146,8 @@ select distinct
   null::integer as term_month_i_want,
   null::uuid[] as excluded_company_ids,
   false as wants_gdo,
-  null::text as temp_client_phone
+  null::text as temp_client_phone,
+  rp.comparison_id
 from
   (
     select
@@ -247,6 +248,7 @@ from
       rpr.total_crs,
       rpr.savings,
       rpr.savings_yearly,
+      rpr.comparison_id,
       COALESCE(
         (
           COALESCE(rpr.current_total_invoice, 0::numeric) * 12::numeric
@@ -256,7 +258,7 @@ from
       1 as rank
     from
       comparison_phone_results rpr
-      left join comparison_phone cp on cp.id = rpr.comparison_id
+      left join comparison_phone cp on cp.id = rpr.comparison_phone_id
   ) rp
   left join _users_supervisors_all us on rp.advisor_id = us.user_id
 where

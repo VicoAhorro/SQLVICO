@@ -69,6 +69,7 @@ base AS (
     cl.excluded_company_ids,
     cl.wants_gdo,
     cl.temp_client_phone,
+    cl.comparison_id,
 
     -- Candidata de tarifas nuevas
     cr.id          AS new_rate_id,
