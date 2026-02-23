@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS public.comparison_light_results (
     anual_consumption_p1 DOUBLE PRECISION,
     anual_consumption_p2 DOUBLE PRECISION,
     anual_consumption_p3 DOUBLE PRECISION,
+    max_power DOUBLE PRECISION,
     power_p1 DOUBLE PRECISION,
     power_p2 DOUBLE PRECISION,
     power_days INTEGER,
@@ -54,6 +55,8 @@ CREATE TABLE IF NOT EXISTS public.comparison_light_results (
     total_power_price DOUBLE PRECISION,
     total_consumption_price DOUBLE PRECISION,
     total_surpluses_price DOUBLE PRECISION,
+    total_consumption DOUBLE PRECISION,
+    total_anual_consumption DOUBLE PRECISION,
     
     new_total_price DOUBLE PRECISION, -- Precio mensual pre-IVA y sin mantenimiento
     new_total_price_with_vat DOUBLE PRECISION, -- Precio mensual final (IVA + IEE + Mant incl)

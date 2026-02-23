@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS public.comparison_3_0_results (
     anual_consumption_p4 DOUBLE PRECISION,
     anual_consumption_p5 DOUBLE PRECISION,
     anual_consumption_p6 DOUBLE PRECISION,
+    max_power DOUBLE PRECISION,
     
     power_p1 DOUBLE PRECISION,
     power_p2 DOUBLE PRECISION,
@@ -79,6 +80,8 @@ CREATE TABLE IF NOT EXISTS public.comparison_3_0_results (
     total_power_price DOUBLE PRECISION,
     total_consumption_price DOUBLE PRECISION,
     total_surpluses_price DOUBLE PRECISION,
+    total_consumption DOUBLE PRECISION,
+    total_anual_consumption DOUBLE PRECISION,
     
     new_total_price DOUBLE PRECISION, -- Mensual pre-IVA
     new_total_price_with_vat DOUBLE PRECISION, -- Mensual final con IVA e impuestos

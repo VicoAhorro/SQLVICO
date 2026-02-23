@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS public.comparison_gas_results (
     -- Resultados del Cálculo
     total_power_price DOUBLE PRECISION,
     total_consumption_price DOUBLE PRECISION,
+    total_consumption DOUBLE PRECISION,
+    total_anual_consumption DOUBLE PRECISION,
     
     new_total_price DOUBLE PRECISION, -- Mensual pre-IVA
     new_total_price_with_vat DOUBLE PRECISION, -- Mensual final con IVA e impuestos

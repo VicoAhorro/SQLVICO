@@ -1,594 +1,77 @@
- --DROP VIEW IF EXISTS public._comparisons_detailed_light;
-
-CREATE OR REPLACE VIEW public._comparisons_detailed_light AS
-WITH
--- ====== Base con tarifas candidatas ======
-base AS (
-  SELECT
-    cl.id,
-    cl.created_at,
-    cl.client_email,
-    cl.advisor_id,
-
-    -- Consumos (light: P1..P3)
-    cl.consumption_p1,
-    cl.consumption_p2,
-    cl.consumption_p3,
-
-    -- Potencias (light: P1..P2)
-    cl.power_p1,
-    cl.power_p2,
-
-    cl.current_total_invoice,
-    cl.surpluses,
-    cl."VAT",
-    cl.power_days,
-    cl.pdf_invoice,
-    cl."CUPS",
-    cl.address_id,
-    cl.company,
-    cl.rate_name,
-    cl.invoice_month,
-    cl.equipment_rental,
-    cl.selfconsumption,
-    cl.manual_data,
-    cl.valuation_id,
-    cl.invoice_year,
-    cl.temp_client_name,
-    cl.temp_client_last_name,
-    cl.deleted,
-    cl.deleted_reason,
-    cl.deleted_at,
-    cl.preferred_subrate,
-    cl.wants_permanence,
-
-    -- Anuales (light: P1..P3)
-    cl.anual_consumption_p1,
-    cl.anual_consumption_p2,
-    cl.anual_consumption_p3,
-
-    cl.max_power,
-
-    -- Precios actuales (para coste "actual")
-    cl."precio_kwh_P1",
-    cl."precio_kwh_P2",
-    cl."precio_kwh_P3",
-    cl."precio_kw_P1",
-    cl."precio_kw_P2",
-
-    -- Autoconsumo y totales precalculados de la factura original
-    cl.autoconsumo_precio,
-    cl.totalconsumo,
-    cl.totalpotencia,
-
-    -- Flags
-    cl.tarifa_plana,
-    cl.cif,
-    cl.region,
-    cl.term_month_i_want,
-    cl.excluded_company_ids,
-    cl.wants_gdo,
-    cl.temp_client_phone,
-    cl.comparison_id,
-
-    -- Candidata de tarifas nuevas
-    cr.id          AS new_rate_id,
-    cr.company     AS new_company,
-    cr.rate_name   AS new_rate_name,
-    cr.subrate_name AS new_subrate_name,
-    cr.term_month,
-
-    cr.price_pp1, cr.price_pp2, cr.price_pp3, cr.price_pp4, cr.price_pp5, cr.price_pp6,
-    cr.price_cp1, cr.price_cp2, cr.price_cp3, cr.price_cp4, cr.price_cp5, cr.price_cp6,
-    cr.price_surpluses,
-
-    -- Columnas de mantenimiento
-    cr.has_maintenance,
-    cr.daily_maintenance_with_vat,
-    cr.has_permanence,
-    cr.rate_mode,
-    cl.total_excedentes_precio,
-    cl.comparison_id
-
-  FROM (SELECT * FROM comparison_light WHERE valuation_id IS NULL AND deleted = false) cl
-  LEFT JOIN users u
-  ON u.user_id = cl.advisor_id
-  LEFT JOIN comparison_rates cr
-  ON cr.type = 'light'
-  AND cr.company <> cl.company
-  AND (cr.deleted = FALSE)
-  AND (cr.tenant_id IS NULL 
-        OR u.tenant = ANY(cr.tenant_id)
-      )
-  LEFT JOIN companies c
-  ON c.name = cr.company
-  -- =========================
-  -- 🔸 Filtro principal con fallback de mes/año + subrate
-  -- =========================
-  WHERE (
-      -- 1️⃣ Tarifas fijas: solo filtra por subrate, sin mes/año
-      (cr.rate_mode <> 'Indexada'
-        AND (
-            cl.preferred_subrate IS NULL
-            OR cl.preferred_subrate = ''
-            OR LOWER(cr.subrate_name::text) = LOWER(cl.preferred_subrate::text)
-        )
-      )
-
-      -- 2️⃣ Tarifas indexadas: coincidencia exacta de mes/año + subrate
-      OR (cr.rate_mode = 'Indexada'
-          AND ((cr.invoice_month = cl.invoice_month AND cr.invoice_year = cl.invoice_year)
-            AND (
-                cl.preferred_subrate IS NULL
-                OR cl.preferred_subrate = ''
-                OR LOWER(cr.subrate_name::text) = LOWER(cl.preferred_subrate::text)
-            )
-          )
-      )
-
-      -- 3️⃣ Tarifas genéricas (sin periodo definido)
-      OR (cr.invoice_month IS NULL AND cr.invoice_year IS NULL)
-
-      -- 4️⃣ Fallback: si no hay tarifas del mes/año con esa preferred_subrate → permitir todas del mes/año (solo indexadas)
-      OR (
-          cr.rate_mode = 'Indexada'
-          AND (cr.invoice_month = cl.invoice_month AND cr.invoice_year = cl.invoice_year)
-          AND NOT EXISTS (
-              SELECT 1
-              FROM comparison_rates crs
-              WHERE crs.type = 'light'
-                AND crs.company <> cl.company
-                AND crs.invoice_month = cl.invoice_month
-                AND crs.invoice_year = cl.invoice_year
-                AND crs.rate_mode = 'Indexada'
-                AND LOWER(crs.subrate_name::text) = LOWER(cl.preferred_subrate::text)
-          )
-      )
-
-      -- 5️⃣ Fallback: si no hay tarifas del mes exacto → permitir cualquiera del mismo año (solo indexadas)
-      OR (
-          cr.rate_mode = 'Indexada'
-          AND cr.invoice_year = cl.invoice_year
-          AND NOT EXISTS (
-              SELECT 1
-              FROM comparison_rates cry
-              WHERE cry.type = 'light'
-                AND cry.company <> cl.company
-                AND cry.invoice_month = cl.invoice_month
-                AND cry.invoice_year = cl.invoice_year
-                AND cry.rate_mode = 'Indexada'
-          )
-      )
-  )
-
-  -- =========================
-  -- 🔸 Otros filtros coherentes con tu vista
-  -- =========================
-  AND (cl.region IS NULL OR cl.region = ANY (cr.region))
-
-  -- -- ✅ Excluir companias seleccionadas (si hay ids)
-  AND (
-    cl.excluded_company_ids IS NULL 
-    OR NOT (
-      cr.company IN (
-        SELECT c_ex.name 
-        FROM companies c_ex 
-        WHERE c_ex.id = ANY (cl.excluded_company_ids)
-      )
-    )
-  )
-
-  -- ✅ Autoconsumo simétrico (solo coinciden si ambos tienen el mismo valor lógico)
-  AND (
-    (cl.selfconsumption = TRUE AND COALESCE(cr.selfconsumption, FALSE) = TRUE)
-    OR (cl.selfconsumption IS DISTINCT FROM TRUE AND cr.selfconsumption IS DISTINCT FROM TRUE)
-  )
-
-  -- ✅ CIF igual o nulo
-  AND (cr.cif IS NULL OR cr.cif = cl.cif)
-
-  -- =========================
-  -- 🔸 Filtro de permanencia (maneja NULL)
-  -- =========================
-  AND (cl.wants_permanence IS NULL OR cr.has_permanence = cl.wants_permanence)
-  AND (cl.wants_permanence IS NOT TRUE OR cl.term_month_i_want IS NULL OR cr.term_month <= cl.term_month_i_want)
-  
-  -- ✅ Filtro GDO (solo si el cliente lo solicita)
-  AND (cl.wants_gdo = false OR cr.has_gdo = true)
-  ),
--- ====== Metrizaciones mensuales y totales base ======
-m_calc AS (
-  SELECT
-    b.*,
-
-    -- Cálculo de mantenimiento mensual
-    CASE 
-      WHEN b.has_maintenance = true THEN 
-        b.daily_maintenance_with_vat * COALESCE(b.power_days, 0)::double precision
-      ELSE 0 
-    END AS maintenance_total,
-
-    -- Totales "nuevo" (energia + potencia) por mes, pre-IVA (para trazabilidad)
-    (COALESCE(b.consumption_p1,0::real)*COALESCE(b.price_cp1,0::real) +
-     COALESCE(b.consumption_p2,0::real)*COALESCE(b.price_cp2,0::real) +
-     COALESCE(b.consumption_p3,0::real)*COALESCE(b.price_cp3,0::real))                 AS m_consumo,
-
-    (COALESCE(b.power_p1,0::real)*COALESCE(b.price_pp1,0::real)*COALESCE(b.power_days,0::double precision) +
-     COALESCE(b.power_p2,0::real)*COALESCE(b.price_pp2,0::real)*COALESCE(b.power_days,0::double precision)) AS m_potencia,
-
-    -- Totales mensuales por bloque (para trazabilidad)
-    (COALESCE(b.consumption_p1,0::real)*COALESCE(b.price_cp1,0::real) +
-     COALESCE(b.consumption_p2,0::real)*COALESCE(b.price_cp2,0::real) +
-     COALESCE(b.consumption_p3,0::real)*COALESCE(b.price_cp3,0::real))                 AS total_consumption_price,
-
-    (COALESCE(b.power_p1,0::real)*COALESCE(b.price_pp1,0::real)*COALESCE(b.power_days,0::double precision) +
-     COALESCE(b.power_p2,0::real)*COALESCE(b.price_pp2,0::real)*COALESCE(b.power_days,0::double precision)) AS total_power_price,
-
-    COALESCE(b.surpluses,0)*COALESCE(b.price_surpluses,0)                   AS total_surpluses_price,
-
-    -- Precio mensual NUEVO (pre-IVA, sin IEE)
-    (
-      COALESCE(b.power_p1, 0::real) * COALESCE(b.price_pp1, 0::real) * COALESCE(b.power_days, 0)::double precision +
-      COALESCE(b.power_p2, 0::real) * COALESCE(b.price_pp2, 0::real) * COALESCE(b.power_days, 0)::double precision +
-      COALESCE(b.consumption_p1, 0::real) * COALESCE(b.price_cp1, 0::real) +
-      COALESCE(b.consumption_p2, 0::real) * COALESCE(b.price_cp2, 0::real) +
-      COALESCE(b.consumption_p3, 0::real) * COALESCE(b.price_cp3, 0::real) -
-      COALESCE(b.surpluses, 0::real) * COALESCE(b.price_surpluses, 0::real)
-    ) AS new_total_price
-
-  FROM base b
-),
-
--- ====== Totales con IEE/VAT y anuales ======
-tot AS (
-  SELECT
-    m.*,
-
-    -- IEE mensual (para columna iee_monthly)
-    (m.m_consumo + m.m_potencia) * 0.05113::double precision                                     AS iee_monthly,
-
-    -- Calcular base sin mantenimiento primero
-    CASE
-      WHEN m.tarifa_plana = TRUE THEN
-       ( (
-          (COALESCE(m.new_total_price, 0)::double precision * 1.05113::double precision)
-          + COALESCE(m.equipment_rental, 0)::double precision
-        ) * (1.0::double precision + COALESCE(m."VAT", 0)::double precision))
-      ELSE
-        ((
-          (COALESCE(m.new_total_price, 0)::double precision * 1.05113::double precision)
-          + COALESCE(m.equipment_rental, 0)::double precision
-        ) * (1.0::double precision + COALESCE(m."VAT", 0)::double precision))
-    END AS new_total_price_with_vat_base,
-
-
-    -- Precio anual NUEVO con IEE + VAT + mantenimiento anual
-    ((
-      COALESCE(m.anual_consumption_p1,0::real)*COALESCE(m.price_cp1,0::real) +
-      COALESCE(m.anual_consumption_p2,0::real)*COALESCE(m.price_cp2,0::real) +
-      COALESCE(m.anual_consumption_p3,0::real)*COALESCE(m.price_cp3,0::real) +
-      COALESCE(NULLIF(m.power_p1,0::double precision),1::real)*COALESCE(m.price_pp1,0::real)*365::double precision +
-      COALESCE(m.power_p2,0::real)*COALESCE(m.price_pp2,0::real)*365::double precision
-      - COALESCE(m.surpluses,0) * 182.5::double precision / NULLIF(m.power_days::double precision,0) * COALESCE(m.price_surpluses,0::real)
-    ) * (1 + 0.05113::double precision) * (1 + COALESCE(m."VAT",0::real))) 
-    + (COALESCE(m.daily_maintenance_with_vat, 0) * 365) AS new_total_yearly_price_with_vat,
-
-    -- Precio anual ACTUAL con IEE + VAT (para savings_yearly)
-    (
-      COALESCE(m.anual_consumption_p1,0::real)*COALESCE(m."precio_kwh_P1",0::real) +
-      COALESCE(m.anual_consumption_p2,0::real)*COALESCE(m."precio_kwh_P2",0::real) +
-      COALESCE(m.anual_consumption_p3,0::real)*COALESCE(m."precio_kwh_P3",0::real) +
-      COALESCE(NULLIF(m.power_p1,0::double precision),1::real)*COALESCE(m."precio_kw_P1",0::real)*365::double precision +
-      COALESCE(m.power_p2,0::real)*COALESCE(m."precio_kw_P2",0::real)*365::double precision
-      - COALESCE(m.surpluses,0) * 182.5::double precision / NULLIF(m.power_days::double precision,0) * COALESCE(m.autoconsumo_precio,0)
-    ) * (1 + 0.05113::double precision) * (1 + COALESCE(m."VAT",0::real))                         AS current_total_yearly_price_with_vat
-  FROM m_calc m
-),
-
--- ====== CRS y ahorros ======
-with_crs AS (
-  SELECT
-    t.*,
-    crs.id AS crs_id,
-    -- CRS total (solo P1..P3 energía y P1..P2 potencia en light)
-    COALESCE(t.anual_consumption_p1,0::real)*COALESCE(crs.crs_cp1,0::real) +
-    COALESCE(t.anual_consumption_p2,0::real)*COALESCE(crs.crs_cp2,0::real) +
-    COALESCE(t.anual_consumption_p3,0::real)*COALESCE(crs.crs_cp3,0::real) +
-    COALESCE(t.power_p1,0::real)*COALESCE(crs.crs_pp1,0::real) +
-    COALESCE(t.power_p2,0::real)*COALESCE(crs.crs_pp2,0::real) +
-    COALESCE(crs.fixed_crs,0::real)                                                         AS total_crs,
-
-    -- Ahorro mensual (actual mensual - nuevo mensual con mantenimiento)
-    CASE
-      WHEN t.new_company IS NOT NULL THEN
-        COALESCE(t.current_total_invoice, 0::real)::double precision
-        -
-        (
-          t.new_total_price_with_vat_base + COALESCE(t.maintenance_total, 0)
-        )
-      ELSE 0.0::double precision
-    END                                                                                AS savings,
-    -- Ahorro anual (actual anual - nuevo anual con mantenimiento)
-    CASE
-      WHEN t.tarifa_plana = TRUE THEN
-        t.current_total_invoice * (365.0 / NULLIF(t.power_days::numeric,0))::double precision
-        - t.new_total_yearly_price_with_vat
-      WHEN t.new_company IS NOT NULL THEN
-        t.current_total_yearly_price_with_vat - t.new_total_yearly_price_with_vat
-      ELSE 0.0::double precision
-    END                                                                                AS savings_yearly
-  FROM tot t
-  LEFT JOIN comparison_rates_crs crs
-    ON crs.comparison_rate_id = t.new_rate_id
-   AND (crs.min_kw_anual IS NULL OR (COALESCE(t.anual_consumption_p1,0::real)+COALESCE(t.anual_consumption_p2,0::real)+COALESCE(t.anual_consumption_p3,0::real)) >= crs.min_kw_anual)
-   AND (crs.max_kw_anual IS NULL OR (COALESCE(t.anual_consumption_p1,0::real)+COALESCE(t.anual_consumption_p2,0::real)+COALESCE(t.anual_consumption_p3,0::real)) <  crs.max_kw_anual)
-   AND (crs.min_power   IS NULL OR t.power_p1 >= crs.min_power)
-   AND (crs.max_power   IS NULL OR t.power_p1 <  crs.max_power)
-),
-
--- ====== Ranking ======
-rank_prep AS (
-  SELECT
-    w.*,
-    (NULLIF(w.preferred_subrate, '') IS NOT NULL) AS has_subrate_pref,
-    (NULLIF(w.preferred_subrate, '') IS NOT NULL AND w.new_subrate_name = w.preferred_subrate) AS subrate_match
-  FROM with_crs w
-),
-
--- Agrega por id para saber si EXISTE al menos un match de subrate preferida
-subrate_exist AS (
-  SELECT
-    id,
-    BOOL_OR(subrate_match) AS exists_subrate_match_for_id
-  FROM rank_prep
-  GROUP BY id
-),
-
--- Ranking final con prioridad por subrate cuando exista al menos una coincidencia
-ranked AS (
-  SELECT
-    rp.*,
-    se.exists_subrate_match_for_id,
-
-    CASE
-      WHEN rp.new_company IS NOT NULL AND rp.savings_yearly > 0
-        THEN rp.savings_yearly + COALESCE(rp.total_crs,0::real)::double precision * 4.0
-      ELSE rp.savings_yearly + COALESCE(rp.total_crs,0::real)::double precision * 4.0
-    END AS ranked_crs,
-
-    ROW_NUMBER() OVER (
-      PARTITION BY rp.id
-      ORDER BY
-        -- 1) Si hay preferencia y existe al menos una coincidencia, prioriza solo las que coinciden
-        CASE
-          WHEN rp.has_subrate_pref AND se.exists_subrate_match_for_id
-            THEN CASE WHEN rp.subrate_match THEN 1 ELSE 0 END
-          ELSE 1  -- sin preferencia o sin coincidencias: no penalizar (fallback)
-        END DESC,
-
-        -- 2) Score de negocio (ahorro + CRS)
-        CASE
-          WHEN rp.new_company IS NOT NULL AND rp.savings_yearly > 0
-            THEN rp.savings_yearly + COALESCE(rp.total_crs,0::real)::double precision * 4.0
-          ELSE rp.savings_yearly + COALESCE(rp.total_crs,0::real)::double precision * 4.0
-        END DESC
-    ) AS rank
-  FROM rank_prep rp
-  LEFT JOIN subrate_exist se USING (id)
-),
-
--- ====== Supervisores y datos asesor ======
-with_advisor AS (
-  SELECT
-    r.*,
-    us.supervisors,
-    us.email AS advisor_email,
-    us.display_name AS advisor_display_name
-  FROM ranked r
-  LEFT JOIN _users_supervisors_all us ON r.advisor_id = us.user_id
-)
-
--- ====== SELECT FINAL ======
-SELECT DISTINCT
-  -- Identificación y cabecera
-  rc.id,
-  rc.created_at,
-  rc.client_email,
-  rc.advisor_id,
-
-  -- Consumos por periodo (normalizamos P4..P6 = 0)
-  rc.consumption_p1,
-  rc.consumption_p2,
-  rc.consumption_p3,
-  0::real AS consumption_p4,
-  0::real AS consumption_p5,
-  0::real AS consumption_p6,
-
-  -- Anuales por periodo (normalizamos P4..P6 = 0)
-  rc.anual_consumption_p1,
-  rc.anual_consumption_p2,
-  rc.anual_consumption_p3,
-  0::real AS anual_consumption_p4,
-  0::real AS anual_consumption_p5,
-  0::real AS anual_consumption_p6,
-
-  -- Autoconsumo
-  rc.autoconsumo_precio,
-
-  -- Precios potencia nuevos (P3..P6 = 0 en light)
-  rc."precio_kw_P1",
-  rc."precio_kw_P2",
-  0::real AS "precio_kw_P3",
-  0::real AS "precio_kw_P4",
-  0::real AS "precio_kw_P5",
-  0::real AS "precio_kw_P6",
-
-  -- Precios energía nuevos (P4..P6 = 0 en light)
-  rc."precio_kwh_P1",
-  rc."precio_kwh_P2",
-  rc."precio_kwh_P3",
-  0::real AS "precio_kwh_P4",
-  0::real AS "precio_kwh_P5",
-  0::real AS "precio_kwh_P6",
-
-  -- Totales consumo
-  (COALESCE(rc.consumption_p1,0::real)+COALESCE(rc.consumption_p2,0::real)+COALESCE(rc.consumption_p3,0::real))::real AS total_consumption,
-  (COALESCE(rc.anual_consumption_p1,0::real)+COALESCE(rc.anual_consumption_p2,0::real)+COALESCE(rc.anual_consumption_p3,0::real))::real AS total_anual_consumption,
-
-  -- Potencias (normalizamos P3..P6 = 0)
-  rc.power_p1,
-  rc.power_p2,
-  0::real AS power_p3,
-  0::real AS power_p4,
-  0::real AS power_p5,
-  0::real AS power_p6,
-
-  -- Factura actual / excedentes
-  rc.current_total_invoice,
-  rc.surpluses,
-  rc.total_surpluses_price,
-  0::real AS power_surpluses,
-
-  -- Fiscalidad y metadatos
-  rc."VAT",
-  rc.power_days AS days,
-  rc.pdf_invoice,
-  rc."CUPS",
-  rc.address_id,
-  rc.company,
-  rc.rate_name,
-  rc.invoice_month,
-  rc.equipment_rental,
-  rc.selfconsumption,
-  rc.manual_data,
-  0::real AS reactive,            -- no aplica en light (normalizado a 0)
-  rc.valuation_id,
-  rc.invoice_year,
-  0::real AS meter_rental,        -- no aplica, normalizado a 0
-  rc.preferred_subrate,
-
-  -- Nueva tarifa
-  rc.new_company,
-  rc.new_rate_name,
-  rc.new_subrate_name,
-  rc.price_pp1,
-  rc.price_pp2,
-  rc.price_pp3,
-  rc.price_pp4,
-  rc.price_pp5,
-  rc.price_pp6,
-  rc.price_cp1,
-  rc.price_cp2,
-  rc.price_cp3,
-  rc.price_cp4,
-  rc.price_cp5,
-  rc.price_cp6,
-  rc.price_surpluses,
-
-  -- Totales cálculo nuevo (mensual pre-IVA)
-  rc.total_power_price,
-  rc.total_consumption_price,
-  rc.new_total_price,
-
-  -- Tipo y metadatos de cliente/filtros
-  'light'::text AS type,
-  COALESCE(rc.temp_client_name,'')      AS temp_client_name,
-  COALESCE(rc.temp_client_last_name,'') AS temp_client_last_name,
-  ARRAY['light'::text,'All'::text]      AS type_filter,
-
-  rc.deleted,
-  rc.deleted_reason,
-  rc.deleted_at,
-  rc.new_rate_id,
-  COALESCE(rc.max_power,0)::real AS max_power,
-
-  -- Telefonía/pack normalizados a 0 en light
-  0 AS speed_fiber,
-  0 AS mobile_lines,
-  0 AS mobile_total_gb,
-  FALSE AS fijo,
-  0 AS new_speed_fiber,
-  0 AS new_total_mobile_lines,
-  0 AS new_mobile_total_gb,
-  ''::text AS rate_pack,
-  0 AS phone_total_anual_price,
-
-  -- CRS y ahorros
-  rc.crs_id,
-  rc.total_crs,
-  rc.savings,
-  rc.savings_yearly,
-  rc.ranked_crs,
-  rc.rank,
-
-  -- Flags e impuestos
-  rc.tarifa_plana,
-  rc.iee_monthly,
-
-  -- IEE anual (derivado de anuales * factor)
-  (
-    (
-      COALESCE(rc.anual_consumption_p1,0::real)*COALESCE(rc.price_cp1,0::real) +
-      COALESCE(rc.anual_consumption_p2,0::real)*COALESCE(rc.price_cp2,0::real) +
-      COALESCE(rc.anual_consumption_p3,0::real)*COALESCE(rc.price_cp3,0::real) +
-      (COALESCE(rc.power_p1,0::real)*COALESCE(rc.price_pp1,0::real) +
-       COALESCE(rc.power_p2,0::real)*COALESCE(rc.price_pp2,0::real)) * 365::double precision
-    ) * 0.05113::double precision
-  ) AS iee,
-
-  -- Precio nuevo mensual con IVA + mantenimiento
-  rc.new_total_price_with_vat_base + COALESCE(rc.maintenance_total, 0) AS new_total_price_with_vat,
-
-  rc.new_total_yearly_price_with_vat,
-
-  -- % ahorro (coherente con gas/3_0)
-  CASE
-    WHEN rc.new_company IS NOT NULL AND rc.current_total_yearly_price_with_vat <> 0 AND rc.tarifa_plana is not true
-      THEN (rc.current_total_yearly_price_with_vat - rc.new_total_yearly_price_with_vat)
-           / rc.current_total_yearly_price_with_vat
-    WHEN rc.tarifa_plana = TRUE AND rc.power_days > 0
-      THEN (
-        rc.current_total_invoice * (365.0 / rc.power_days::double precision) - rc.new_total_yearly_price_with_vat
-      ) / NULLIF(rc.current_total_invoice * (365.0 / rc.power_days::double precision), 0::double precision)
-    ELSE 0.0::double precision
-  END AS saving_percentage,
-
-  -- Personas
-  rc.supervisors,
-  COALESCE(rc.temp_client_name,'')      AS client_name,
-  COALESCE(rc.temp_client_last_name,'') AS client_last_name,
-  rc.advisor_email,
-  rc.advisor_display_name,
-  ARRAY[COALESCE(rc.advisor_email,''::text),'All'] AS advisor_filter,
-
-  -- Derivados de fecha, búsqueda y filtros
-  EXTRACT(MONTH FROM rc.created_at)::text AS created_month,
-  EXTRACT(YEAR  FROM rc.created_at)::text AS created_year,
-  COALESCE(rc."CUPS",'') || ' ' ||
-  COALESCE(rc.advisor_display_name,'') || ' ' ||
-  COALESCE(rc.advisor_email,'') || ' ' ||
-  LOWER(
-    COALESCE(rc.client_email,'') || ' ' ||
-    COALESCE(rc.company,'') || ' ' ||
-    COALESCE(rc.rate_name,'') || ' ' ||
-    COALESCE(rc.temp_client_name,'') || ' ' ||
-    COALESCE(rc.temp_client_last_name,'')
-  ) AS search,
-  ARRAY[COALESCE(rc.company,''::text),'All'] AS company_filter,
-  rc.cif,
-  rc.region,
-  rc.daily_maintenance_with_vat::numeric(8,2),
-  rc.has_permanence,
-  rc.rate_mode,
-  rc.total_excedentes_precio,
-  null::rate_mode_type AS rate_i_have,
-  rc.term_month,
-  rc.term_month_i_want,
-  rc.excluded_company_ids,
-  rc.wants_gdo,
-  rc.temp_client_phone,
-  rc.comparison_id,
-  rc.wants_permanence
-
-FROM with_advisor rc
-WHERE rc.rank = 1;
+create table public.comparison_light (
+  id uuid not null default gen_random_uuid (),
+  created_at timestamp without time zone not null default now(),
+  client_email text null,
+  advisor_id uuid null,
+  consumption_p1 real not null default '0'::real,
+  consumption_p2 real not null default '0'::real,
+  consumption_p3 real not null default '0'::real,
+  power_p1 real not null default '0'::real,
+  power_p2 real not null default '0'::real,
+  current_total_invoice real not null default '0'::real,
+  surpluses real not null default '0'::real,
+  "VAT" real not null default '0'::real,
+  power_days integer not null default 0,
+  pdf_invoice text not null default ''::text,
+  proposal_date timestamp without time zone null,
+  "CUPS" text not null default ''::text,
+  address_id uuid null,
+  company text not null default ''::text,
+  rate_name text not null default ''::text,
+  invoice_month integer null,
+  equipment_rental real not null default '0'::real,
+  selfconsumption boolean not null default false,
+  manual_data boolean not null default false,
+  valuation_id uuid null,
+  invoice_year integer null,
+  temp_client_name text not null default ''::text,
+  temp_client_last_name text not null default ''::text,
+  deleted boolean not null default false,
+  deleted_reason text null,
+  preferred_subrate text null,
+  anual_consumption_p1 real null,
+  anual_consumption_p2 real null,
+  anual_consumption_p3 real null,
+  max_power real null,
+  "precio_kwh_P1" real not null default '0'::real,
+  "precio_kwh_P2" real not null default '0'::real,
+  "precio_kwh_P3" real not null default '0'::real,
+  "precio_kw_P1" real not null default '0'::real,
+  "precio_kw_P2" real not null default '0'::real,
+  autoconsumo_precio real null default '0'::real,
+  totalconsumo real null,
+  totalpotencia real null,
+  tarifa_plana boolean null,
+  cif boolean null default false,
+  region text null default 'PENINSULA'::text,
+  source_type_id bigint not null default 0,
+  wants_permanence boolean null,
+  total_excedentes_precio real not null default 0,
+  comparison_id uuid null,
+  invoice_address text null,
+  term_month_i_want numeric null,
+  deleted_at timestamp without time zone null,
+  excluded_company_ids uuid[] not null default '{}'::uuid[],
+  wants_gdo boolean not null default false,
+  temp_client_phone text null,
+  constraint comparison_light_pkey primary key (id),
+  constraint comparison_light_address_id_fkey foreign KEY (address_id) references clients_addresses (id),
+  constraint comparison_light_advisor_id_fkey foreign KEY (advisor_id) references auth.users (id) on delete set null,
+  constraint comparison_light_comparison_id_fkey foreign KEY (comparison_id) references comparisons (id) on delete CASCADE,
+  constraint comparison_light_source_type_id_fkey foreign KEY (source_type_id) references source_type (id) on update CASCADE on delete set default,
+  constraint comparison_light_valuation_id_fkey foreign KEY (valuation_id) references clients_valuations (id) on delete set null
+) TABLESPACE pg_default;
+
+create index IF not exists idx_comparison_light_deleted_false on public.comparison_light using btree (id) TABLESPACE pg_default
+where
+  (deleted = false);
+
+create index IF not exists idx_comparison_light_created_at on public.comparison_light using btree (created_at) TABLESPACE pg_default;
+
+create index IF not exists idx_comparison_light_advisor on public.comparison_light using btree (advisor_id) TABLESPACE pg_default;
+
+create index IF not exists idx_comparison_light_selfconsumption on public.comparison_light using btree (selfconsumption) TABLESPACE pg_default;
+
+create trigger trg_set_deleted_at BEFORE
+update on comparison_light for EACH row
+execute FUNCTION set_deleted_at_on_delete ();
