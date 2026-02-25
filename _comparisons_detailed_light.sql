@@ -87,8 +87,7 @@ base AS (
     cr.daily_maintenance_with_vat,
     cr.has_permanence,
     cr.rate_mode,
-    cl.total_excedentes_precio,
-    cl.comparison_id
+    cl.total_excedentes_precio
 
   FROM (SELECT * FROM comparison_light WHERE valuation_id IS NULL AND deleted = false) cl
   LEFT JOIN users u
@@ -350,11 +349,7 @@ ranked AS (
     rp.*,
     se.exists_subrate_match_for_id,
 
-    CASE
-      WHEN rp.new_company IS NOT NULL AND rp.savings_yearly > 0
-        THEN rp.savings_yearly + COALESCE(rp.total_crs,0::real)::double precision * 4.0
-      ELSE rp.savings_yearly + COALESCE(rp.total_crs,0::real)::double precision * 4.0
-    END AS ranked_crs,
+    rp.savings_yearly + COALESCE(rp.total_crs, 0::real)::double precision * 4.0 AS ranked_crs,
 
     ROW_NUMBER() OVER (
       PARTITION BY rp.id
@@ -363,15 +358,14 @@ ranked AS (
         CASE
           WHEN rp.has_subrate_pref AND se.exists_subrate_match_for_id
             THEN CASE WHEN rp.subrate_match THEN 1 ELSE 0 END
-          ELSE 1  -- sin preferencia o sin coincidencias: no penalizar (fallback)
+          ELSE 1
         END DESC,
 
-        -- 2) Score de negocio (ahorro + CRS)
-        CASE
-          WHEN rp.new_company IS NOT NULL AND rp.savings_yearly > 0
-            THEN rp.savings_yearly + COALESCE(rp.total_crs,0::real)::double precision * 4.0
-          ELSE rp.savings_yearly + COALESCE(rp.total_crs,0::real)::double precision * 4.0
-        END DESC
+        -- 2) Priorizar siempre que haya ahorro real (evita que negativos suban por alto CRS)
+        CASE WHEN rp.savings_yearly > 0 THEN 1 ELSE 0 END DESC,
+
+        -- 3) Score de negocio (ahorro + CRS * 4)
+        rp.savings_yearly + COALESCE(rp.total_crs, 0::real)::double precision * 4.0 DESC
     ) AS rank
   FROM rank_prep rp
   LEFT JOIN subrate_exist se USING (id)

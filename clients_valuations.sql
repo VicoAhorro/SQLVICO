@@ -40,7 +40,19 @@ create table public.clients_valuations (
   idioma text null,
   notificaciones boolean not null default false,
   deleted_at timestamp without time zone null,
+  temp_client_phone text null,
+  new_total_yearly_price_with_vat real null,
   constraint clients_valuations_pkey primary key (id),
   constraint clients_valuations_advisor_id_fkey foreign KEY (advisor_id) references auth.users (id) on delete set null,
   constraint clients_valuations_contract_id_fkey foreign KEY (contract_id) references clients_contracts (id) on delete CASCADE
 ) TABLESPACE pg_default;
+
+create trigger trg_set_deleted_at BEFORE
+update on clients_valuations for EACH row
+execute FUNCTION set_deleted_at_on_delete ();
+
+create trigger trg_sync_valuations_index
+after INSERT
+or
+update on clients_valuations for EACH row
+execute FUNCTION fn_sync_valuations_search_index ();
