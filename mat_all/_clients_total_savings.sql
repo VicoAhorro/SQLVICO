@@ -1,8 +1,15 @@
 create materialized view public._clients_total_savings as
 select
-  _contracts_detailed.client_email,
-  sum(_contracts_detailed.total_savings) as total_savings
+  c.client_email,
+  COALESCE(SUM(ci.total_invoice * c.saving_percentage), 0)::double precision as total_savings
 from
-  _contracts_detailed
+  public.clients_contracts c
+  join public.clients_invoices ci on ci."CUPS" = c."CUPS"
+where
+  c.deleted = false
 group by
-  _contracts_detailed.client_email;
+  c.client_email;
+
+CREATE INDEX IF NOT EXISTS idx_clients_total_savings_email ON public._clients_total_savings (client_email);
+
+REFRESH MATERIALIZED VIEW public._clients_total_savings;

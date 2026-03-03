@@ -1,3 +1,4 @@
+drop materialized view if exists public.mat_all_data_racc cascade;
 create materialized view public.mat_all_data_racc as
 select
   mat_all_data.source,
@@ -22,6 +23,7 @@ select
   mat_all_data.total_savings,
   mat_all_data."CUPS",
   mat_all_data.status,
+  mat_all_data.subestadocompanias,
   mat_all_data.last_update,
   mat_all_data.fecha_baja,
   mat_all_data.baja_firma_delegada,
@@ -33,7 +35,9 @@ select
   mat_all_data.comparison_created_at,
   mat_all_data.deleted,
   mat_all_data.deleted_reason,
-  mat_all_data.deleted_at
+  mat_all_data.deleted_at,
+  mat_all_data.incident_date,
+  mat_all_data.incident_type
 from
   mat_all_data
 where

@@ -1,6 +1,6 @@
 create or replace view public._valuations_detailed as
-select distinct
-  on (v.id) v.id,
+select
+  v.id,
   v.created_at,
   v.client_email,
   v.contract_type,
@@ -39,20 +39,9 @@ select distinct
   v.new_rate,
   v.new_subrate,
   case
-    when (
-      (
-        select
-          u2.racc
-        from
-          users u2
-        where
-          u2.user_id = v.advisor_id
-        limit
-          1
-      )
-    ) = true then (
+    when u.racc = true then (
       select
-        array_cat(us.supervisors, array_agg(ur.user_id)) as array_cat
+        array_cat(us.supervisors, array_agg(ur.user_id))
       from
         users_racc ur
     )
@@ -107,29 +96,29 @@ from
     from
       (
         select
-          comparison_light.valuation_id,
-          comparison_light.cif,
-          comparison_light.region,
-          comparison_light.wants_permanence,
-          comparison_light.rate_name
+          valuation_id,
+          cif,
+          region,
+          wants_permanence,
+          rate_name
         from
           comparison_light
-        union
+        union all
         select
-          comparison_gas.valuation_id,
-          comparison_gas.cif,
-          comparison_gas.region,
-          comparison_gas.wants_permanence,
-          comparison_gas.rate_name
+          valuation_id,
+          cif,
+          region,
+          wants_permanence,
+          rate_name
         from
           comparison_gas
-        union
+        union all
         select
-          comparison_3_0.valuation_id,
-          comparison_3_0.cif,
-          comparison_3_0.region,
-          comparison_3_0.wants_permanence,
-          comparison_3_0.rate_name
+          valuation_id,
+          cif,
+          region,
+          wants_permanence,
+          rate_name
         from
           comparison_3_0
       ) c

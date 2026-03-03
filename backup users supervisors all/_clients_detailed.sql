@@ -1,4 +1,4 @@
-create or replace view public._clients_detailed as
+create view public._clients_detailed as
 select
   c.id,
   c.created_at,
@@ -32,9 +32,10 @@ select
     c.phone_number
   ) as search,
   c.idioma as client_language,
-  COALESCE(us.racc, false) as is_racc,
+  ur.user_id is not null as is_racc,
   c.apellido_representante
 from
-  public.clients c
-  left join public._users_supervisors_all us on c.advisor_id = us.user_id
-  left join public._clients_total_savings ts on c.email = ts.client_email;
+  clients c
+  left join _users_supervisors_all us on c.advisor_id = us.user_id
+  left join users_racc ur on c.advisor_id = ur.user_id
+  left join _clients_total_savings ts on c.email = ts.client_email;

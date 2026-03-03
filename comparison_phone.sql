@@ -16,6 +16,7 @@ create table public.comparison_phone (
   landline boolean not null default false,
   temp_client_name text null,
   temp_client_last_name text null,
+  temp_client_phone text null,
   installation_address text null,
   source_type_id bigint not null default 0,
   wants_permanence boolean null,
