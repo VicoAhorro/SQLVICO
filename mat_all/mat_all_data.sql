@@ -23,7 +23,8 @@ with
       on (cv.contract_id) cv.contract_id,
       cv.id as valuation_id,
       cv.created_at as valuation_created_at,
-      cv.pdf_proposal
+      cv.pdf_proposal,
+      cv.rate_type
     from
       clients_valuations cv
     where
@@ -91,7 +92,8 @@ select
   c.deleted_reason,
   c.deleted_at,
   case when c.status = 'INCIDENCIA' then li.incident_date else null end as incident_date,
-  case when c.status = 'INCIDENCIA' then li.incident_type else null end as incident_type
+  case when c.status = 'INCIDENCIA' then li.incident_type else null end as incident_type,
+  lvc.rate_type
 from
   clients_contracts c
   join users u on u.user_id = c.advisor_id
@@ -139,7 +141,8 @@ select
   c.deleted_reason,
   c.deleted_at,
   null::timestamp without time zone as incident_date,
-  null::text as incident_type
+  null::text as incident_type,
+  NULL::public.rate_mode_type as rate_type
 from
   mat_comparisons_historic c
   left join clients_valuations v on v.id = c.valuation_id
@@ -183,7 +186,8 @@ select
   v.deleted_reason,
   v.deleted_at,
   null::timestamp without time zone as incident_date,
-  null::text as incident_type
+  null::text as incident_type,
+  v.rate_type
 from
   clients_valuations v
   left join users u on u.user_id = v.advisor_id
@@ -238,7 +242,8 @@ select
   null::text as deleted_reason,
   null::timestamp without time zone as deleted_at,
   null::timestamp without time zone as incident_date,
-  null::text as incident_type
+  null::text as incident_type,
+  NULL::public.rate_mode_type as rate_type
 from
   clients cl
   left join users u on u.user_id = cl.advisor_id

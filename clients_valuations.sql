@@ -42,6 +42,7 @@ create table public.clients_valuations (
   deleted_at timestamp without time zone null,
   temp_client_phone text null,
   new_total_yearly_price_with_vat real null,
+  rate_type public.rate_mode_type null,
   constraint clients_valuations_pkey primary key (id),
   constraint clients_valuations_advisor_id_fkey foreign KEY (advisor_id) references auth.users (id) on delete set null,
   constraint clients_valuations_contract_id_fkey foreign KEY (contract_id) references clients_contracts (id) on delete CASCADE

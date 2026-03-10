@@ -37,7 +37,8 @@ select
   mat_all_data.deleted_reason,
   mat_all_data.deleted_at,
   mat_all_data.incident_date,
-  mat_all_data.incident_type
+  mat_all_data.incident_type,
+  mat_all_data.rate_type
 from
   mat_all_data
 where

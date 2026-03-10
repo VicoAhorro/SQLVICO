@@ -19,7 +19,8 @@ latest_val_by_contract AS (
          contract_id,
          id         AS valuation_id,
          created_at AS valuation_created_at,
-         pdf_proposal
+         pdf_proposal,
+         rate_type
   FROM public._valuations_detailed
   WHERE contract_id IS NOT NULL
   ORDER BY contract_id, created_at DESC
@@ -70,7 +71,8 @@ SELECT
   lcc.comparison_id         AS comparison_id,         -- 31
   lcc.comparison_created_at AS comparison_created_at, -- 32
   c.deleted                 AS deleted,               -- 33
-  NULL::text                AS deleted_reason         -- 34
+  NULL::text                AS deleted_reason,        -- 34
+  lvc.rate_type             AS rate_type              -- 35
 FROM public._contracts_detailed c
 JOIN public.users u ON u.user_id = c.advisor_id
 LEFT JOIN latest_val_by_contract lvc ON lvc.contract_id = c.id
@@ -112,7 +114,8 @@ SELECT
   c.id                AS comparison_id,       -- 31
   c.created_at        AS comparison_created_at, -- 32
   c.deleted           AS deleted,             -- 33
-  NULL::text          AS deleted_reason            -- 34
+  NULL::text          AS deleted_reason,           -- 34
+  NULL::public.rate_mode_type AS rate_type         -- 35
 FROM public.mat_comparisons_historic c
 LEFT JOIN public._valuations_detailed v ON v.id = c.valuation_id
 LEFT JOIN public.users u ON u.user_id = c.advisor_id
@@ -152,8 +155,9 @@ SELECT
   v.pdf_proposal     AS pdf_proposal,    -- 30
   NULL::uuid         AS comparison_id,   -- 31
   NULL::timestamp    AS comparison_created_at, -- 32
-  v.deleted     AS deleted,         -- 33
-  v.deleted_reason   AS deleted_reason   -- 34
+  v.deleted          AS deleted,         -- 33
+  v.deleted_reason   AS deleted_reason,  -- 34
+  v.rate_type        AS rate_type        -- 35
 FROM public._valuations_detailed v
 LEFT JOIN public.users u ON u.user_id = v.advisor_id
 
@@ -193,7 +197,8 @@ SELECT
   lc.comparison_id,                  -- 31
   lc.comparison_created_at,          -- 32
   NULL::boolean        AS deleted,      -- 33
-  NULL::text        AS deleted_reason-- 34
+  NULL::text           AS deleted_reason, -- 34
+  NULL::public.rate_mode_type AS rate_type -- 35
 FROM public._clients_detailed cl
 LEFT JOIN public.users u ON u.user_id = cl.advisor_id
 LEFT JOIN latest_val lv

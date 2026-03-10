@@ -78,3 +78,64 @@ ON public.comparison_summary
 FOR SELECT
 TO authenticated
 USING (true);
+
+-- clients_addresses RLS policies
+ALTER TABLE public.clients_addresses ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "ClientsAddresses: Delete if admin or advisor/supervisor"
+ON public.clients_addresses
+FOR DELETE
+USING (
+    (EXISTS ( SELECT 1
+   FROM public.users u_admin
+  WHERE ((u_admin.user_id = auth.uid()) AND (u_admin.is_admin = true)))) OR
+    (EXISTS ( SELECT 1
+   FROM public.clients c
+  WHERE ((c.id = clients_addresses.client_id) AND (
+      (c.advisor_id = auth.uid()) OR
+      (EXISTS ( SELECT 1
+         FROM public._users_supervisors us
+        WHERE ((us.user_id = c.advisor_id) AND (auth.uid() = ANY (us.supervisors))))) OR
+      ((auth.uid() IN ( SELECT users_racc.user_id FROM public.users_racc)) AND
+       (c.advisor_id IN ( SELECT users_racc.user_id FROM public.users_racc)))
+  ))))
+);
+
+CREATE POLICY "ClientsAddresses: Insert if admin, advisor, or supervisor"
+ON public.clients_addresses
+FOR INSERT
+WITH CHECK (
+    (EXISTS ( SELECT 1
+   FROM public.users u_admin
+  WHERE ((u_admin.user_id = auth.uid()) AND (u_admin.is_admin = true)))) OR
+    (EXISTS ( SELECT 1
+   FROM public.clients c
+  WHERE ((c.id = clients_addresses.client_id) AND (
+      (c.advisor_id = auth.uid()) OR
+      (EXISTS ( SELECT 1
+         FROM public._users_supervisors us
+        WHERE ((us.user_id = c.advisor_id) AND (auth.uid() = ANY (us.supervisors))))) OR
+      ((auth.uid() IN ( SELECT users_racc.user_id FROM public.users_racc)) AND
+       (c.advisor_id IN ( SELECT users_racc.user_id FROM public.users_racc)))
+  ))))
+);
+
+CREATE POLICY "ClientsAddresses: Select if admin or advisor/supervisor"
+ON public.clients_addresses
+FOR SELECT
+USING (
+    (EXISTS ( SELECT 1
+   FROM public.users u_admin
+  WHERE ((u_admin.user_id = auth.uid()) AND (u_admin.is_admin = true)))) OR
+    (EXISTS ( SELECT 1
+   FROM public.clients c
+  WHERE ((c.id = clients_addresses.client_id) AND (
+      (c.advisor_id = auth.uid()) OR
+      (EXISTS ( SELECT 1
+         FROM public._users_supervisors us
+        WHERE ((us.user_id = c.advisor_id) AND (auth.uid() = ANY (us.supervisors))))) OR
+      ((auth.uid() IN ( SELECT users_racc.user_id FROM public.users_racc)) AND
+       (c.advisor_id IN ( SELECT users_racc.user_id FROM public.users_racc)))
+  )))) OR
+    (client_email = auth.email())
+);
