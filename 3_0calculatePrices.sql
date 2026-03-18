@@ -17,6 +17,7 @@ DECLARE
   consumo_6 NUMERIC := 0;
   vat NUMERIC := 0;
   equipment NUMERIC := 0;
+  power_surpluses_var NUMERIC := 0;
   rate_i_have_var TEXT := '';
   rate_i_want_var TEXT := '';
 
@@ -43,14 +44,14 @@ BEGIN
     totalpotencia, totalconsumo, power_days, preferred_subrate,
     power_p1, power_p2, power_p3, power_p4, power_p5, power_p6,
     consumption_p1, consumption_p2, consumption_p3, consumption_p4, consumption_p5, consumption_p6,
-    "VAT", COALESCE(equipment_rental, 0), c.rate_i_have, c.rate_i_want,
+    "VAT", COALESCE(equipment_rental, 0), COALESCE(power_surpluses, 0), c.rate_i_have, c.rate_i_want,
     c."precio_kwh_P1", c."precio_kwh_P2", c."precio_kwh_P3",
     c."precio_kwh_P4", c."precio_kwh_P5", c."precio_kwh_P6"
   INTO 
     totalfijo, totalvariable, diasdefactura, tarifa,
     potencia_1, potencia_2, potencia_3, potencia_4, potencia_5, potencia_6,
     consumo_1, consumo_2, consumo_3, consumo_4, consumo_5, consumo_6,
-    vat, equipment, rate_i_have_var, rate_i_want_var,
+    vat, equipment, power_surpluses_var, rate_i_have_var, rate_i_want_var,
     precio_kwh_tbl_1, precio_kwh_tbl_2, precio_kwh_tbl_3,
     precio_kwh_tbl_4, precio_kwh_tbl_5, precio_kwh_tbl_6
   FROM public.comparison_3_0 c
@@ -106,8 +107,8 @@ BEGIN
     END IF;
   END LOOP;
 
-  -- Calcular total estimado con equipment_rental (aunque sea 0)
-  current_invoice_estimate := ROUND((((totalvariable + totalfijo) * 1.0511) + equipment) * (1 + vat), 2);
+  -- Calcular total estimado con equipment_rental y power_surpluses
+  current_invoice_estimate := ROUND((((totalvariable + totalfijo + power_surpluses_var) * 1.0511) + equipment) * (1 + vat), 2);
 
   IF rate_i_have_var = 'Fija' THEN
     UPDATE public.comparison_3_0
