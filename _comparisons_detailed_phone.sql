@@ -150,7 +150,9 @@ select distinct
   false as wants_gdo,
   null::text as temp_client_phone,
   rp.comparison_id,
-  rp.wants_permanence
+  rp.wants_permanence,
+  null::text as ssaa_preference,
+  null::text as new_ssaa
 from
   (
     select

@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS public.comparison_3_0_results (
     cif BOOLEAN,
     region TEXT,
     wants_gdo BOOLEAN,
+    ssaa_preference TEXT,
     rate_i_have TEXT,
     rate_i_want TEXT,
     
@@ -55,6 +56,7 @@ CREATE TABLE IF NOT EXISTS public.comparison_3_0_results (
     new_company TEXT,
     new_rate_name TEXT,
     new_subrate_name TEXT,
+    new_ssaa TEXT,
     new_rate_id UUID,
     rate_mode TEXT,
     

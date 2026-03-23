@@ -152,7 +152,8 @@ WITH calculated_prices_3_0 AS (
     FALSE AS tarifa_plana,
     c30.cif,
     c30.region,
-    c30.comparison_id
+    c30.ssaa_preference,
+    cr.ssaa AS new_ssaa
     
   FROM (SELECT * FROM comparison_3_0 WHERE valuation_id IS NULL AND (deleted IS NULL OR deleted = FALSE)) c30
   LEFT JOIN users u 
@@ -187,6 +188,22 @@ WITH calculated_prices_3_0 AS (
             OR cr.subrate_name = c30.preferred_subrate
           )
           AND (
+            c30.ssaa_preference IS NULL
+            OR c30.ssaa_preference = ''
+            OR (
+              c30.ssaa_preference = '12'
+              AND COALESCE(cr.ssaa, '') IN ('12', '18', 'incluidos')
+            )
+            OR (
+              c30.ssaa_preference = '18'
+              AND COALESCE(cr.ssaa, '') IN ('18', 'incluidos')
+            )
+            OR (
+              c30.ssaa_preference = 'incluidos'
+              AND COALESCE(cr.ssaa, '') = 'incluidos'
+            )
+          )
+          AND (
             c30.wants_permanence IS NOT TRUE
             OR cr.has_permanence = TRUE
             OR NOT EXISTS (
@@ -205,6 +222,22 @@ WITH calculated_prices_3_0 AS (
                   c30.preferred_subrate IS NULL
                   OR c30.preferred_subrate = ''
                   OR crp.subrate_name = c30.preferred_subrate
+                )
+                AND (
+                  c30.ssaa_preference IS NULL
+                  OR c30.ssaa_preference = ''
+                  OR (
+                    c30.ssaa_preference = '12'
+                    AND COALESCE(crp.ssaa, '') IN ('12', '18', 'incluidos')
+                  )
+                  OR (
+                    c30.ssaa_preference = '18'
+                    AND COALESCE(crp.ssaa, '') IN ('18', 'incluidos')
+                  )
+                  OR (
+                    c30.ssaa_preference = 'incluidos'
+                    AND COALESCE(crp.ssaa, '') = 'incluidos'
+                  )
                 )
                 AND (c30.region IS NULL OR c30.region = ANY (crp.region))
                 AND crp.has_permanence = TRUE
@@ -686,7 +719,9 @@ SELECT DISTINCT
   rc.wants_gdo,
   rc.temp_client_phone,
   rc.comparison_id,
-  rc.wants_permanence
+  rc.wants_permanence,
+  rc.ssaa_preference,
+  rc.new_ssaa
 
 FROM all_comparisons_ranked rc
 LEFT JOIN _users_supervisors_all us ON rc.advisor_id = us.user_id

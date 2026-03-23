@@ -72,6 +72,7 @@ create table public.comparison_3_0 (
   deleted_at timestamp without time zone null,
   temp_client_phone text null,
   excluded_company_ids uuid[] not null default '{}'::uuid[],
+  ssaa_preference text null,
   constraint comparison_3_0_pkey primary key (id),
   constraint comparison_3_0_address_id_fkey foreign KEY (address_id) references clients_addresses (id),
   constraint comparison_3_0_advisor_id_fkey foreign KEY (advisor_id) references auth.users (id) on delete set null,

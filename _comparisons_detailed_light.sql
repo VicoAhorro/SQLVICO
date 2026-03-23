@@ -582,7 +582,9 @@ SELECT DISTINCT
   rc.wants_gdo,
   rc.temp_client_phone,
   rc.comparison_id,
-  rc.wants_permanence
+  rc.wants_permanence,
+  null::text AS ssaa_preference,
+  null::text AS new_ssaa
 
 FROM with_advisor rc
 WHERE rc.rank = 1;

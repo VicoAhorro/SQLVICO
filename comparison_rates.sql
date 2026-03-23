@@ -35,6 +35,7 @@ create table public.comparison_rates (
   max_consumption real null,
   term_month numeric null,
   has_gdo boolean not null default false,
+  ssaa text null,
   constraint comparison_rates_duplicate_pkey primary key (id)
 ) TABLESPACE pg_default;
 

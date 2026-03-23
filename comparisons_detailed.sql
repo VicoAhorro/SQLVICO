@@ -5,4 +5,6 @@ SELECT * FROM public._comparisons_detailed_3_0
 UNION ALL
 SELECT * FROM public._comparisons_detailed_light
 UNION ALL
-SELECT * FROM public._comparisons_detailed_phone;
+SELECT * FROM public._comparisons_detailed_phone
+UNION ALL
+SELECT * FROM public._comparisons_detailed_insurance;

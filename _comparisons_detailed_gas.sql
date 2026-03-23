@@ -129,8 +129,7 @@ calculated_prices_gas AS (
     cg.region,
     cr.has_permanence,
     cr.rate_mode,
-    0                                             AS total_excedentes_precio,
-    cg.comparison_id
+    0                                             AS total_excedentes_precio
 
   FROM (SELECT * FROM comparison_gas WHERE valuation_id IS NULL AND deleted = false) cg
   LEFT JOIN users u 
@@ -627,7 +626,9 @@ SELECT
   rc.wants_gdo,
   rc.temp_client_phone,
   rc.comparison_id,
-  rc.wants_permanence
+  rc.wants_permanence,
+  null::text AS ssaa_preference,
+  null::text AS new_ssaa
 
 FROM all_comparisons_ranked rc
 LEFT JOIN _users_supervisors_all us ON rc.advisor_id = us.user_id
