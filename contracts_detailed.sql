@@ -115,6 +115,7 @@ select
   c.deleted,
   (c.activation_date + '1 year'::interval)::date as fecha_prevista_renovacion,
   array[c.new_company, 'All'::text] as new_company_filter,
+  c.insurance_type,
   c.cif as is_cif,
   c.region as valuation_region,
   c.is_carga_contrato,
