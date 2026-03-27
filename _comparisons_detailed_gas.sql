@@ -128,6 +128,7 @@ calculated_prices_gas AS (
     cg.cif,
     cg.region,
     cr.has_permanence,
+    cr.has_gdo,
     cr.rate_mode,
     0                                             AS total_excedentes_precio
 
@@ -181,10 +182,8 @@ calculated_prices_gas AS (
       )
  )
  -- ⬇️ Fallback de permanencia:
- AND (
-      cg.wants_permanence IS NOT TRUE                        -- el cliente no pidió permanencia → acepta cualquiera
-      OR cr.has_permanence = TRUE                            -- hay permanencia y la tarifa la tiene
-      OR NOT EXISTS (                                         -- Fallback: si NO hay ninguna con permanencia,
+  AND (
+       (cg.wants_permanence IS TRUE AND (cr.has_permanence = TRUE OR NOT EXISTS (                                         -- Fallback: si NO hay ninguna con permanencia,
         SELECT 1                                              -- ignora la condición y acepta cualquiera
         FROM comparison_rates crp
         WHERE crp.type = 'gas'
@@ -201,8 +200,10 @@ calculated_prices_gas AS (
                OR crp.subrate_name = cg.rate_name
           )
           AND crp.has_permanence = TRUE
-      )
- )
+       )))
+       OR (cg.wants_permanence IS FALSE AND COALESCE(cr.has_permanence, false) = false)
+       OR (cg.wants_permanence IS NULL)
+  )
  AND (cg.region IS NULL OR cg.region = ANY (cr.region))
 
   -- ✅ Excluir companias seleccionadas (si hay ids)
@@ -628,7 +629,8 @@ SELECT
   rc.comparison_id,
   rc.wants_permanence,
   null::text AS ssaa_preference,
-  null::text AS new_ssaa
+  null::text AS new_ssaa,
+  rc.has_gdo
 
 FROM all_comparisons_ranked rc
 LEFT JOIN _users_supervisors_all us ON rc.advisor_id = us.user_id

@@ -204,9 +204,7 @@ WITH calculated_prices_3_0 AS (
             )
           )
           AND (
-            c30.wants_permanence IS NOT TRUE
-            OR cr.has_permanence = TRUE
-            OR NOT EXISTS (
+            (c30.wants_permanence IS TRUE AND (cr.has_permanence = TRUE OR NOT EXISTS (
               SELECT 1
               FROM comparison_rates crp
               WHERE crp.type = '3_0'
@@ -242,7 +240,9 @@ WITH calculated_prices_3_0 AS (
                 AND (c30.region IS NULL OR c30.region = ANY (crp.region))
                 AND crp.has_permanence = TRUE
                 AND (c30.wants_gdo = false OR crp.has_gdo = true)
-            )
+            )))
+            OR (c30.wants_permanence IS FALSE AND COALESCE(cr.has_permanence, false) = false)
+            OR (c30.wants_permanence IS NULL)
           )
           AND (cr.cif IS NULL OR cr.cif = c30.cif)
           AND (c30.region IS NULL OR c30.region = ANY (cr.region))
@@ -260,7 +260,7 @@ WITH calculated_prices_3_0 AS (
           AND (
             c30.wants_permanence IS NOT TRUE
             OR c30.term_month_i_want IS NULL 
-            OR cr.term_month <= c30.term_month_i_want
+            OR (cr.term_month <= c30.term_month_i_want AND cr.term_month > (c30.term_month_i_want - 12))
           )
         )
       )
@@ -724,7 +724,8 @@ SELECT DISTINCT
   rc.comparison_id,
   rc.wants_permanence,
   rc.ssaa_preference,
-  rc.new_ssaa
+  rc.new_ssaa,
+  rc.has_gdo
 
 FROM all_comparisons_ranked rc
 LEFT JOIN _users_supervisors_all us ON rc.advisor_id = us.user_id

@@ -152,7 +152,8 @@ select distinct
   rp.comparison_id,
   rp.wants_permanence,
   null::text as ssaa_preference,
-  null::text as new_ssaa
+  null::text as new_ssaa,
+  false as has_gdo
 from
   (
     select

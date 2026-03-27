@@ -86,6 +86,7 @@ base AS (
     cr.has_maintenance,
     cr.daily_maintenance_with_vat,
     cr.has_permanence,
+    cr.has_gdo,
     cr.rate_mode,
     cl.total_excedentes_precio
 
@@ -189,8 +190,8 @@ base AS (
   -- =========================
   -- 🔸 Filtro de permanencia (maneja NULL)
   -- =========================
-  AND (cl.wants_permanence IS NULL OR cr.has_permanence = cl.wants_permanence)
-  AND (cl.wants_permanence IS NOT TRUE OR cl.term_month_i_want IS NULL OR cr.term_month <= cl.term_month_i_want)
+  AND (cl.wants_permanence IS NULL OR COALESCE(cr.has_permanence, false) = cl.wants_permanence)
+  AND (cl.wants_permanence IS NOT TRUE OR cl.term_month_i_want IS NULL OR (cr.term_month <= cl.term_month_i_want AND cr.term_month > (cl.term_month_i_want - 12)))
   
   -- ✅ Filtro GDO (solo si el cliente lo solicita)
   AND (cl.wants_gdo = false OR cr.has_gdo = true)
@@ -584,7 +585,8 @@ SELECT DISTINCT
   rc.comparison_id,
   rc.wants_permanence,
   null::text AS ssaa_preference,
-  null::text AS new_ssaa
+  null::text AS new_ssaa,
+  rc.has_gdo
 
 FROM with_advisor rc
 WHERE rc.rank = 1;
