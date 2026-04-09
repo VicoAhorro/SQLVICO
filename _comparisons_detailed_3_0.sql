@@ -190,6 +190,11 @@ WITH calculated_prices_3_0 AS (
           AND (
             c30.ssaa_preference IS NULL
             OR c30.ssaa_preference = ''
+            OR c30.ssaa_preference = 'null'
+            OR (
+              c30.ssaa_preference = 'false'
+              AND COALESCE(cr.ssaa, '') = ''
+            )
             OR (
               c30.ssaa_preference = '12'
               AND COALESCE(cr.ssaa, '') IN ('12', '18', 'incluidos')
@@ -224,6 +229,11 @@ WITH calculated_prices_3_0 AS (
                 AND (
                   c30.ssaa_preference IS NULL
                   OR c30.ssaa_preference = ''
+                  OR c30.ssaa_preference = 'null'
+                  OR (
+                    c30.ssaa_preference = 'false'
+                    AND COALESCE(crp.ssaa, '') = ''
+                  )
                   OR (
                     c30.ssaa_preference = '12'
                     AND COALESCE(crp.ssaa, '') IN ('12', '18', 'incluidos')
