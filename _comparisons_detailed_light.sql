@@ -130,9 +130,11 @@ base AS (
       OR (cr.invoice_month IS NULL AND cr.invoice_year IS NULL)
 
       -- 4️⃣ Fallback: si no hay tarifas del mes/año con esa preferred_subrate → permitir todas del mes/año (solo indexadas)
+      -- Solo aplica cuando el cliente quiere indexada (preferred_subrate = NULL, '' o 'Indexada')
       OR (
           cr.rate_mode = 'Indexada'
           AND (cr.invoice_month = cl.invoice_month AND cr.invoice_year = cl.invoice_year)
+          AND (cl.preferred_subrate IS NULL OR cl.preferred_subrate = '' OR LOWER(cl.preferred_subrate) = 'indexada')
           AND NOT EXISTS (
               SELECT 1
               FROM comparison_rates crs
@@ -146,9 +148,11 @@ base AS (
       )
 
       -- 5️⃣ Fallback: si no hay tarifas del mes exacto → permitir cualquiera del mismo año (solo indexadas)
+      -- Solo aplica cuando el cliente quiere indexada (preferred_subrate = NULL, '' o 'Indexada')
       OR (
           cr.rate_mode = 'Indexada'
           AND cr.invoice_year = cl.invoice_year
+          AND (cl.preferred_subrate IS NULL OR cl.preferred_subrate = '' OR LOWER(cl.preferred_subrate) = 'indexada')
           AND NOT EXISTS (
               SELECT 1
               FROM comparison_rates cry

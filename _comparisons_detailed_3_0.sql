@@ -167,7 +167,24 @@ WITH calculated_prices_3_0 AS (
         (
           c30.rate_i_have = 'Fija'
           AND c30.rate_i_want = 'Indexada'
-          AND cr.id = 'febdbb18-8de5-4f2c-982a-ddfe2e18b3c8'
+          AND cr.id = CASE
+            -- 3.0, cif FALSE, region PENINSULA
+            WHEN c30.preferred_subrate LIKE '3.0%' AND c30.cif = FALSE AND c30.region = 'PENINSULA' 
+              THEN 'cce9bccb-bc00-47f4-9f05-2977544a9fe3'::uuid
+            -- 3.0, cif null, region baleares y canarias
+            WHEN c30.preferred_subrate LIKE '3.0%' AND c30.region IN ('BALEARES', 'CANARIAS')
+              THEN 'ac0fa327-4e2b-4f8a-9d29-d31b7cbf316d'::uuid
+            -- 6.1, cif true, region peninsula
+            WHEN c30.preferred_subrate LIKE '6.1%' AND c30.cif = TRUE AND c30.region = 'PENINSULA'
+              THEN '28895943-4e49-45e1-83ef-4ad06a4550e7'::uuid
+            -- 6.1, cif false, region peninsula
+            WHEN c30.preferred_subrate LIKE '6.1%' AND c30.cif = FALSE AND c30.region = 'PENINSULA'
+              THEN 'c5c8bd54-2080-4f67-9a7d-92df769a134b'::uuid
+            -- 6.1, cif null, region baleares canarias
+            WHEN c30.preferred_subrate LIKE '6.1%' AND c30.region IN ('BALEARES', 'CANARIAS')
+              THEN 'c9e03895-972b-4add-bcc5-627493bc044f'::uuid
+            ELSE 'febdbb18-8de5-4f2c-982a-ddfe2e18b3c8'::uuid -- Fallback original
+          END
         )
         -- Resto de casos: aplican los filtros habituales
         OR (
@@ -178,8 +195,8 @@ WITH calculated_prices_3_0 AS (
           AND (
             cr.rate_mode::text <> 'Indexada'
             OR (
-              (cr.invoice_month IS NULL AND cr.invoice_year IS NULL)
-              OR (cr.invoice_month = c30.invoice_month AND cr.invoice_year = c30.invoice_year)
+              (cr.invoice_year IS NULL OR cr.invoice_year = c30.invoice_year)
+              AND (cr.invoice_month IS NULL OR cr.invoice_month = c30.invoice_month)
             )
           )
           AND (
@@ -217,8 +234,8 @@ WITH calculated_prices_3_0 AS (
                 AND (
                   crp.rate_mode::text <> 'Indexada'
                   OR (
-                    (crp.invoice_month IS NULL AND crp.invoice_year IS NULL)
-                    OR (crp.invoice_month = c30.invoice_month AND crp.invoice_year = c30.invoice_year)
+                    (crp.invoice_year IS NULL OR crp.invoice_year = c30.invoice_year)
+                    AND (crp.invoice_month IS NULL OR crp.invoice_month = c30.invoice_month)
                   )
                 )
                 AND (
@@ -254,7 +271,7 @@ WITH calculated_prices_3_0 AS (
             OR (c30.wants_permanence IS FALSE AND COALESCE(cr.has_permanence, false) = false)
             OR (c30.wants_permanence IS NULL)
           )
-          AND (cr.cif IS NULL OR cr.cif = c30.cif)
+          AND (cr.cif IS NULL OR c30.cif IS NULL OR cr.cif = c30.cif)
           AND (c30.region IS NULL OR c30.region = ANY (cr.region))
           AND (c30.wants_gdo = false OR cr.has_gdo = true)
           AND (

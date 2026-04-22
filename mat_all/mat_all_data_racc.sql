@@ -38,11 +38,23 @@ select
   mat_all_data.deleted_at,
   mat_all_data.incident_date,
   mat_all_data.incident_type,
-  mat_all_data.rate_type
+  mat_all_data.rate_type,
+  mat_all_data.rejected_type,
+  mat_all_data.proposed_company,
+  mat_all_data.proposed_rate_type,
+  mat_all_data.changed_by,
+  mat_all_data.changed_by_email
 from
   mat_all_data
 where
   mat_all_data.tenant = 1;
 
-CREATE UNIQUE INDEX mat_all_data_racc_unique_idx
-ON public.mat_all_data_racc (source, id);
+-- Índices para mat_all_data_racc
+CREATE UNIQUE INDEX IF NOT EXISTS mat_all_data_racc_unique_idx ON public.mat_all_data_racc (source, id);
+CREATE INDEX IF NOT EXISTS mat_all_data_racc_cups_idx ON public.mat_all_data_racc ("CUPS");
+CREATE INDEX IF NOT EXISTS mat_all_data_racc_email_idx ON public.mat_all_data_racc (client_email);
+CREATE INDEX IF NOT EXISTS mat_all_data_racc_dni_idx ON public.mat_all_data_racc ("DNI");
+CREATE INDEX IF NOT EXISTS mat_all_data_racc_advisor_idx ON public.mat_all_data_racc (advisor_id);
+CREATE INDEX IF NOT EXISTS mat_all_data_racc_status_idx ON public.mat_all_data_racc (status);
+CREATE INDEX IF NOT EXISTS mat_all_data_racc_created_at_idx ON public.mat_all_data_racc (created_at DESC);
+CREATE INDEX IF NOT EXISTS mat_all_data_racc_valuation_id_idx ON public.mat_all_data_racc (valuation_id);
