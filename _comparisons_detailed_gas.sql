@@ -636,3 +636,4 @@ FROM all_comparisons_ranked rc
 LEFT JOIN _users_supervisors_all us ON rc.advisor_id = us.user_id
 WHERE rc.rank = 1
   AND rc.type = 'gas'
+  AND rc.new_rate_id IS NOT NULL

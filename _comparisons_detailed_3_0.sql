@@ -50,6 +50,7 @@ WITH calculated_prices_3_0 AS (
     COALESCE(c30.surpluses,0::real)*COALESCE(cr.price_surpluses,0::real) AS total_surpluses_price,
     c30.power_surpluses,
     c30."VAT",
+    COALESCE(c30.iee, 0.05113)::real AS iee,
     c30.power_days AS days,
     c30.pdf_invoice,
     c30."CUPS",
@@ -210,19 +211,19 @@ WITH calculated_prices_3_0 AS (
             OR c30.ssaa_preference = 'null'
             OR (
               c30.ssaa_preference = 'false'
-              AND COALESCE(cr.ssaa, '') = ''
+              AND cr.ssaa = 'no'
             )
             OR (
               c30.ssaa_preference = '12'
-              AND COALESCE(cr.ssaa, '') IN ('12', '18', 'incluidos')
+              AND cr.ssaa IN ('12', '18', 'incluidos')
             )
             OR (
               c30.ssaa_preference = '18'
-              AND COALESCE(cr.ssaa, '') IN ('18', 'incluidos')
+              AND cr.ssaa IN ('18', 'incluidos')
             )
             OR (
               c30.ssaa_preference = 'incluidos'
-              AND COALESCE(cr.ssaa, '') = 'incluidos'
+              AND cr.ssaa = 'incluidos'
             )
           )
           AND (
@@ -249,19 +250,19 @@ WITH calculated_prices_3_0 AS (
                   OR c30.ssaa_preference = 'null'
                   OR (
                     c30.ssaa_preference = 'false'
-                    AND COALESCE(crp.ssaa, '') = ''
+                    AND crp.ssaa = 'no'
                   )
                   OR (
                     c30.ssaa_preference = '12'
-                    AND COALESCE(crp.ssaa, '') IN ('12', '18', 'incluidos')
+                    AND crp.ssaa IN ('12', '18', 'incluidos')
                   )
                   OR (
                     c30.ssaa_preference = '18'
-                    AND COALESCE(crp.ssaa, '') IN ('18', 'incluidos')
+                    AND crp.ssaa IN ('18', 'incluidos')
                   )
                   OR (
                     c30.ssaa_preference = 'incluidos'
-                    AND COALESCE(crp.ssaa, '') = 'incluidos'
+                    AND crp.ssaa = 'incluidos'
                   )
                 )
                 AND (c30.region IS NULL OR c30.region = ANY (crp.region))
@@ -337,7 +338,7 @@ unified_extended_prices AS (
                   COALESCE(ucp.power_p6,0::real)*COALESCE(ucp."precio_kw_P6",0::real)*365.0
                   - COALESCE(ucp.surpluses,0) * (182.5::double precision / NULLIF(ucp.days::numeric,0)) * COALESCE(ucp.autoconsumo_precio,0)
                   )
-                  * 1.05113
+                  * (1 + COALESCE(ucp.iee, 0.05113))
                 ) * (1 + COALESCE(ucp."VAT",0))
                 -
                 (
@@ -348,7 +349,7 @@ unified_extended_prices AS (
                   COALESCE(ucp.power_p4,0::real)*COALESCE(ucp.price_pp4,0::real)*365.0 +
                   COALESCE(ucp.power_p5,0::real)*COALESCE(ucp.price_pp5,0::real)*365.0 +
                   COALESCE(ucp.power_p6,0::real)*COALESCE(ucp.price_pp6,0::real)*365.0
-                ) * 1.05113 * (1 + COALESCE(ucp."VAT",0))
+                ) * (1 + COALESCE(ucp.iee, 0.05113)) * (1 + COALESCE(ucp."VAT",0))
             )
           -- Fija vs Fija
           WHEN c30_base.rate_i_have = 'Fija' AND ucp.rate_mode = 'Fija' THEN
@@ -368,7 +369,7 @@ unified_extended_prices AS (
                   COALESCE(ucp.power_p6,0::real)*COALESCE(ucp."precio_kw_P6",0::real)*365.0
                   - COALESCE(ucp.surpluses,0) * (182.5::double precision / NULLIF(ucp.days::numeric,0)) * COALESCE(ucp.autoconsumo_precio,0)
                   )
-                  * 1.05113
+                  * (1 + COALESCE(ucp.iee, 0.05113))
                 ) * (1 + COALESCE(ucp."VAT",0))
                 -
                 (
@@ -384,7 +385,7 @@ unified_extended_prices AS (
                   COALESCE(ucp.power_p4,0::real)*COALESCE(ucp.price_pp4,0::real)*365.0 +
                   COALESCE(ucp.power_p5,0::real)*COALESCE(ucp.price_pp5,0::real)*365.0 +
                   COALESCE(ucp.power_p6,0::real)*COALESCE(ucp.price_pp6,0::real)*365.0
-                ) * 1.05113 * (1 + COALESCE(ucp."VAT",0))
+                ) * (1 + COALESCE(ucp.iee, 0.05113)) * (1 + COALESCE(ucp."VAT",0))
             )
           -- Indexada vs Fija
           WHEN c30_base.rate_i_have = 'Indexada' AND ucp.rate_mode = 'Fija' THEN
@@ -404,7 +405,7 @@ unified_extended_prices AS (
                   COALESCE(ucp.power_p6,0::real)*COALESCE(ucp."precio_kw_P6",0::real)*365.0
                   - COALESCE(ucp.surpluses,0) * (182.5::double precision / NULLIF(ucp.days::numeric,0)) * COALESCE(ucp.autoconsumo_precio,0)
                   )
-                  * 1.05113
+                  * (1 + COALESCE(ucp.iee, 0.05113))
                 ) * (1 + COALESCE(ucp."VAT",0))
                 -
                 (
@@ -420,7 +421,7 @@ unified_extended_prices AS (
                   COALESCE(ucp.power_p4,0::real)*COALESCE(ucp.price_pp4,0::real)*365.0 +
                   COALESCE(ucp.power_p5,0::real)*COALESCE(ucp.price_pp5,0::real)*365.0 +
                   COALESCE(ucp.power_p6,0::real)*COALESCE(ucp.price_pp6,0::real)*365.0
-                ) * 1.05113 * (1 + COALESCE(ucp."VAT",0))
+                ) * (1 + COALESCE(ucp.iee, 0.05113)) * (1 + COALESCE(ucp."VAT",0))
             )
           -- Fija vs Indexada
           WHEN c30_base.rate_i_have = 'Fija' AND ucp.rate_mode = 'Indexada' THEN
@@ -440,7 +441,7 @@ unified_extended_prices AS (
                   COALESCE(ucp.power_p6,0::real)*COALESCE(ucp."precio_kw_P6",0::real)*365.0
                   - COALESCE(ucp.surpluses,0) * (182.5::double precision / NULLIF(ucp.days::numeric,0)) * COALESCE(ucp.autoconsumo_precio,0)
                   )
-                  * 1.05113
+                  * (1 + COALESCE(ucp.iee, 0.05113))
                 ) * (1 + COALESCE(ucp."VAT",0))
                 -
                 (
@@ -456,7 +457,7 @@ unified_extended_prices AS (
                   COALESCE(ucp.power_p4,0::real)*COALESCE(ucp.price_pp4,0::real)*365.0 +
                   COALESCE(ucp.power_p5,0::real)*COALESCE(ucp.price_pp5,0::real)*365.0 +
                   COALESCE(ucp.power_p6,0::real)*COALESCE(ucp.price_pp6,0::real)*365.0
-                ) * 1.05113 * (1 + COALESCE(ucp."VAT",0))
+                ) * (1 + COALESCE(ucp.iee, 0.05113)) * (1 + COALESCE(ucp."VAT",0))
             )
           ELSE 0.0
         END
@@ -466,7 +467,7 @@ unified_extended_prices AS (
     CASE
       WHEN ucp.new_company IS NOT NULL THEN
         COALESCE(ucp.current_total_invoice,0::real) -
-        ((COALESCE(ucp.new_total_price,0::real)::double precision * 1.05113 + COALESCE(ucp.equipment_rental,0::real)) * (1 + COALESCE(ucp."VAT",0::real)))
+        ((COALESCE(ucp.new_total_price,0::real)::double precision * (1 + COALESCE(ucp.iee, 0.05113)) + COALESCE(ucp.equipment_rental,0::real)) * (1 + COALESCE(ucp."VAT",0::real)))
       ELSE 0.0
     END AS savings
   FROM unified_calculated_prices ucp
@@ -641,7 +642,7 @@ SELECT DISTINCT
         COALESCE(rc.power_p4, 0::real) * COALESCE(rc.price_pp4, 0::real) * COALESCE(rc.days, 0)::double precision +
         COALESCE(rc.power_p5, 0::real) * COALESCE(rc.price_pp5, 0::real) * COALESCE(rc.days, 0)::double precision +
         COALESCE(rc.power_p6, 0::real) * COALESCE(rc.price_pp6, 0::real) * COALESCE(rc.days, 0)::double precision
-      ) * 0.05113::double precision
+      ) * COALESCE(rc.iee, 0.05113)::double precision
   ) AS iee_monthly,
 
   -- iee
@@ -660,12 +661,12 @@ SELECT DISTINCT
        COALESCE(rc.power_p5,0::real)*COALESCE(rc.price_pp5,0::real) +
        COALESCE(rc.power_p6,0::real)*COALESCE(rc.price_pp6,0::real)
       ) * 365::double precision
-    ) * 0.05113::double precision
+    ) * COALESCE(rc.iee, 0.05113)::double precision
   ) AS iee,
 
   -- new_total_price_with_vat
   (
-    (COALESCE(rc.new_total_price,0::real)::double precision * 1.05113 + COALESCE(rc.equipment_rental,0::real))
+    (COALESCE(rc.new_total_price,0::real)::double precision * (1 + COALESCE(rc.iee, 0.05113)) + COALESCE(rc.equipment_rental,0::real))
     * (1 + COALESCE(rc."VAT",0::real))
   ) AS new_total_price_with_vat,
 
@@ -685,7 +686,7 @@ SELECT DISTINCT
       COALESCE(rc.power_p4,0::real) * COALESCE(rc.price_pp4,0::real) * 365::double precision +
       COALESCE(rc.power_p5,0::real) * COALESCE(rc.price_pp5,0::real) * 365::double precision +
       COALESCE(rc.power_p6,0::real) * COALESCE(rc.price_pp6,0::real) * 365::double precision
-    ) * (1::numeric + 0.05113)::double precision
+    ) * (1::double precision + COALESCE(rc.iee, 0.05113)::double precision)
   ) * (1::double precision + COALESCE(rc."VAT",0::real)) AS new_total_yearly_price_with_vat,
 
   -- saving_percentage
@@ -707,7 +708,7 @@ SELECT DISTINCT
             COALESCE(rc.power_p5,0::real)*COALESCE(rc."precio_kw_P5",0::real)*365.0 +
             COALESCE(rc.power_p6,0::real)*COALESCE(rc."precio_kw_P6",0::real)*365.0
             - COALESCE(rc.surpluses,0) * (182.5::double precision / NULLIF(rc.days::numeric,0)) * COALESCE(rc.autoconsumo_precio,0)
-          ) * 1.05113 * (1 + COALESCE(rc."VAT",0)),
+          ) * (1 + COALESCE(rc.iee, 0.05113)) * (1 + COALESCE(rc."VAT",0)),
           0::double precision
         )
       ELSE 0.0

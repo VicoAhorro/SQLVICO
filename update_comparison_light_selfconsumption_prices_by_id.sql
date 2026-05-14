@@ -2,6 +2,7 @@ DECLARE
   v_totalconsumo NUMERIC := 0;
   v_totalpotencia NUMERIC := 0;
   v_vat NUMERIC := 0;
+  v_iee NUMERIC := 0.05113;
   v_equipment NUMERIC := 0;
   v_total_final NUMERIC := 0;
   v_power_1 NUMERIC := 0;
@@ -17,6 +18,7 @@ BEGIN
     COALESCE(c.totalconsumo, 0),
     COALESCE(c.totalpotencia, 0),
     COALESCE(c."VAT", 0),
+    COALESCE(c.iee, 0.05113),
     COALESCE(c.equipment_rental, 0),
     COALESCE(c.power_p1, 0),
     COALESCE(c.power_p2, 0),
@@ -27,14 +29,15 @@ BEGIN
     COALESCE(c.total_excedentes_precio, 0), -- ✅ Origen correcto
     COALESCE(c.surpluses, 0)
   INTO
-    v_totalconsumo, v_totalpotencia, v_vat, v_equipment,
+    v_totalconsumo, v_totalpotencia, v_vat, v_iee, v_equipment,
     v_power_1, v_power_2, v_days,
     v_cons1, v_cons2, v_cons3,
     v_total_excedentes_precio, v_surpluses
   FROM public.comparison_light c
   WHERE c.id = _id AND NOT c.deleted;
 
-  v_total_final := ROUND((((v_totalconsumo + v_totalpotencia - v_total_excedentes_precio) * 1.0511) + v_equipment) * (1 + v_vat), 2);
+  -- IEE leído de la columna comparison_light.iee (default 0.05113 = 5.113%)
+  v_total_final := ROUND((((v_totalconsumo + v_totalpotencia - v_total_excedentes_precio) * (1 + v_iee)) + v_equipment) * (1 + v_vat), 2);
 
   UPDATE public.comparison_light
   SET

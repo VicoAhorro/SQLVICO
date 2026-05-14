@@ -33,6 +33,9 @@ create table vico.ocr_logs (
   -- Modelo OpenAI utilizado para la extracción principal
   model_used    text                     null,
 
+  -- Coste estimado de la llamada OpenAI en USD (sum de todos los pasos del pipeline)
+  cost_usd      numeric(10, 6)           null,
+
   constraint ocr_logs_pkey primary key (id)
 ) tablespace pg_default;
 
