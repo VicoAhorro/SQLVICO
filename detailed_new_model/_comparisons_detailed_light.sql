@@ -192,6 +192,27 @@ with_crs AS (
   SELECT
     t.*,
     crs.id AS crs_id,
+    -- NP: formula ORIGINAL de los CRS (suma fija + variable, sin renewal_crs)
+    (COALESCE(t.anual_consumption_p1,0::real)*COALESCE(crs.crs_cp1,0::real) +
+     COALESCE(t.anual_consumption_p2,0::real)*COALESCE(crs.crs_cp2,0::real) +
+     COALESCE(t.anual_consumption_p3,0::real)*COALESCE(crs.crs_cp3,0::real) +
+     COALESCE(t.power_p1,0::real)*COALESCE(crs.crs_pp1,0::real) +
+     COALESCE(t.power_p2,0::real)*COALESCE(crs.crs_pp2,0::real) +
+     COALESCE(crs.fixed_crs,0::real))::double precision AS np_value,
+    -- RN: comision RECURRENTE de renovacion = BASE × renewal_crs
+    -- BASE = fixed_crs si esta poblado; si no, la parte variable (consumo/potencia)
+    -- renewal_crs es un multiplicador 0..1 (0 = no pagan renovacion, 1 = 100% renovacion)
+    (COALESCE(
+       crs.fixed_crs,
+       (COALESCE(t.anual_consumption_p1,0::real)*COALESCE(crs.crs_cp1,0::real) +
+        COALESCE(t.anual_consumption_p2,0::real)*COALESCE(crs.crs_cp2,0::real) +
+        COALESCE(t.anual_consumption_p3,0::real)*COALESCE(crs.crs_cp3,0::real) +
+        COALESCE(t.power_p1,0::real)*COALESCE(crs.crs_pp1,0::real) +
+        COALESCE(t.power_p2,0::real)*COALESCE(crs.crs_pp2,0::real))::real,
+       0::real
+     )::double precision
+     * COALESCE(crs.renewal_crs,0)::double precision)::double precision AS rn_value,
+    -- total_crs: formula ORIGINAL (suma simple de fija + variable), expuesta como columna
     COALESCE(t.anual_consumption_p1,0::real)*COALESCE(crs.crs_cp1,0::real) +
     COALESCE(t.anual_consumption_p2,0::real)*COALESCE(crs.crs_cp2,0::real) +
     COALESCE(t.anual_consumption_p3,0::real)*COALESCE(crs.crs_cp3,0::real) +
@@ -232,20 +253,14 @@ with_savings_percentage AS (
   FROM with_crs wc
 ),
 
--- ====== FILTRO NP > Y ======
+-- ====== FILTROS NP > Y y RN > X (Luz B2C) ======
+--   Esta vista es solo B2C (tarifas 2.0TD): NP > 25 AND RN > 0
 filtered_np AS (
   SELECT
     s.*
   FROM with_savings_percentage s
-  WHERE (
-    -- Luz B2C (Particular): NP > 30
-    (COALESCE(s.client_type::text, 'Particular') = 'Particular' AND s.total_crs > 30)
-    OR
-    -- Luz B2B (Empresa): NP > 100
-    (s.client_type::text = 'Empresa' AND s.total_crs > 100)
-    -- Si no hay match (fallback por seguridad si Total CRS es muy bajo y no queremos tirar todo)
-    -- Pero la imagen dice "Definir valor minimo", asi que filtramos.
-  )
+  WHERE s.np_value > 25
+    AND s.rn_value > 0
 ),
 
 rank_prep AS (
@@ -253,11 +268,14 @@ rank_prep AS (
     f.*,
     (NULLIF(f.preferred_subrate, '') IS NOT NULL) AS has_subrate_pref,
     (NULLIF(f.preferred_subrate, '') IS NOT NULL AND f.new_subrate_name = f.preferred_subrate) AS subrate_match,
-    -- Logica k
+    -- Logica k con RAMPA LINEAL entre 5% y 15% (Luz B2C)
+    --   % ahorro <= 5     -> k = 0     (no se premia comision si ahorro es pobre)
+    --   5 < % ahorro < 15 -> k crece linealmente de 0 a 1000
+    --   % ahorro >= 15    -> k = 1000  (tope: prioriza NP/CRS)
     CASE
-      WHEN f.saving_percentage <= 0.10 THEN 0
-      WHEN f.rate_mode = 'Indexada' THEN 500
-      ELSE 1000 -- Fija
+      WHEN f.saving_percentage <= 0.05 THEN 0
+      WHEN f.saving_percentage >= 0.15 THEN 1000
+      ELSE (f.saving_percentage - 0.05) / 0.10 * 1000
     END AS k_factor
   FROM filtered_np f
 ),
@@ -270,14 +288,15 @@ ranked AS (
   SELECT
     rp.*,
     se.exists_subrate_match_for_id,
-    rp.savings_yearly + (rp.k_factor * rp.total_crs) AS ranked_crs,
+    -- Score del ranking: solo considera NP + RN (NO total_crs)
+    rp.savings_yearly + (rp.k_factor * (rp.np_value + rp.rn_value)) AS ranked_crs,
 
     ROW_NUMBER() OVER (
       PARTITION BY rp.id
       ORDER BY
         CASE WHEN rp.has_subrate_pref AND se.exists_subrate_match_for_id THEN CASE WHEN rp.subrate_match THEN 1 ELSE 0 END ELSE 1 END DESC,
         CASE WHEN rp.savings_yearly > 0 THEN 1 ELSE 0 END DESC,
-        rp.savings_yearly + (rp.k_factor * rp.total_crs) DESC
+        rp.savings_yearly + (rp.k_factor * (rp.np_value + rp.rn_value)) DESC
     ) AS rank
   FROM rank_prep rp
   LEFT JOIN subrate_exist se USING (id)
