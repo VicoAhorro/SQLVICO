@@ -218,7 +218,43 @@ unified_extended_prices AS (
     ucp.*,
     crs.id AS crs_id,
 
-    -- CRS total
+    -- NP: formula ORIGINAL de los CRS (suma fija + variable, sin renewal_crs)
+    (COALESCE(ucp.anual_consumption_p1,0::real) * COALESCE(crs.crs_cp1,0::real) +
+     COALESCE(ucp.anual_consumption_p2,0::real) * COALESCE(crs.crs_cp2,0::real) +
+     COALESCE(ucp.anual_consumption_p3,0::real) * COALESCE(crs.crs_cp3,0::real) +
+     COALESCE(ucp.anual_consumption_p4,0::real) * COALESCE(crs.crs_cp4,0::real) +
+     COALESCE(ucp.anual_consumption_p5,0::real) * COALESCE(crs.crs_cp5,0::real) +
+     COALESCE(ucp.anual_consumption_p6,0::real) * COALESCE(crs.crs_cp6,0::real) +
+     COALESCE(ucp.power_p1,0::real) * COALESCE(crs.crs_pp1,0::real) +
+     COALESCE(ucp.power_p2,0::real) * COALESCE(crs.crs_pp2,0::real) +
+     COALESCE(ucp.power_p3,0::real) * COALESCE(crs.crs_pp3,0::real) +
+     COALESCE(ucp.power_p4,0::real) * COALESCE(crs.crs_pp4,0::real) +
+     COALESCE(ucp.power_p5,0::real) * COALESCE(crs.crs_pp5,0::real) +
+     COALESCE(ucp.power_p6,0::real) * COALESCE(crs.crs_pp6,0::real) +
+     COALESCE(crs.fixed_crs,0::real))::double precision AS np_value,
+
+    -- RN: comision RECURRENTE de renovacion = BASE × renewal_crs
+    -- BASE = fixed_crs si esta poblado; si no, la parte variable (consumo/potencia)
+    -- renewal_crs es un multiplicador 0..1 (0 = no pagan renovacion, 1 = 100% renovacion)
+    (COALESCE(
+       crs.fixed_crs,
+       (COALESCE(ucp.anual_consumption_p1,0::real) * COALESCE(crs.crs_cp1,0::real) +
+        COALESCE(ucp.anual_consumption_p2,0::real) * COALESCE(crs.crs_cp2,0::real) +
+        COALESCE(ucp.anual_consumption_p3,0::real) * COALESCE(crs.crs_cp3,0::real) +
+        COALESCE(ucp.anual_consumption_p4,0::real) * COALESCE(crs.crs_cp4,0::real) +
+        COALESCE(ucp.anual_consumption_p5,0::real) * COALESCE(crs.crs_cp5,0::real) +
+        COALESCE(ucp.anual_consumption_p6,0::real) * COALESCE(crs.crs_cp6,0::real) +
+        COALESCE(ucp.power_p1,0::real) * COALESCE(crs.crs_pp1,0::real) +
+        COALESCE(ucp.power_p2,0::real) * COALESCE(crs.crs_pp2,0::real) +
+        COALESCE(ucp.power_p3,0::real) * COALESCE(crs.crs_pp3,0::real) +
+        COALESCE(ucp.power_p4,0::real) * COALESCE(crs.crs_pp4,0::real) +
+        COALESCE(ucp.power_p5,0::real) * COALESCE(crs.crs_pp5,0::real) +
+        COALESCE(ucp.power_p6,0::real) * COALESCE(crs.crs_pp6,0::real))::real,
+       0::real
+     )::double precision
+     * COALESCE(crs.renewal_crs,0)::double precision)::double precision AS rn_value,
+
+    -- total_crs: formula ORIGINAL (suma simple de fija + variable), expuesta como columna
     COALESCE(ucp.anual_consumption_p1,0::real) * COALESCE(crs.crs_cp1,0::real) +
     COALESCE(ucp.anual_consumption_p2,0::real) * COALESCE(crs.crs_cp2,0::real) +
     COALESCE(ucp.anual_consumption_p3,0::real) * COALESCE(crs.crs_cp3,0::real) +
@@ -285,54 +321,75 @@ unified_extended_prices AS (
       CASE
         WHEN ucp.tarifa_plana = TRUE THEN
           COALESCE(ucp.current_total_invoice,0::real) * (365.0 / NULLIF(ucp.days::numeric,0))::double precision
-          - (COALESCE(ucp.anual_consumption_p1,0::real) * (COALESCE(ucp.price_cp1,0::real) + 0.00234) + COALESCE(ucp.price_pp1,0::real) * 365) * (1::double precision + COALESCE(ucp."VAT",0::real))
+          -
+          (
+            COALESCE(ucp.anual_consumption_p1,0::real) * (COALESCE(ucp.price_cp1,0::real) + 0.00234)
+            + COALESCE(NULLIF(ucp.power_p1,0::double precision),1::real) * COALESCE(ucp.price_pp1,0::real) * 365::double precision
+            + COALESCE(NULLIF(ucp.power_p2,0::double precision),1::real) * COALESCE(ucp.price_pp2,0::real) * 365::double precision
+          )
+          * (1::double precision + COALESCE(ucp."VAT",0::real))
         WHEN ucp.new_company IS NOT NULL THEN
-          v.annual_old_with_vat - v.annual_new_with_vat -- IMPORTANTE: El signo original parece invertido en el SQL base o depende de como se use. Usaremos anual_old - anual_new para ahorro positivo.
+          v.annual_new_with_vat - v.annual_old_with_vat
         ELSE 0.0::double precision
       END AS savings_yearly
   ) sly
 ),
 
--- ====== AHORRO % PARA LOGICA K ======
+-- ====== AHORRO % PARA LOGICA K (formula identica a la original — sin +0.00234) ======
 with_saving_pct AS (
     SELECT
         uep.*,
         CASE
-            WHEN uep.tarifa_plana = TRUE AND uep.days > 0 THEN (uep.current_monthly_annualized - uep.annual_new_with_vat) / NULLIF(uep.current_monthly_annualized, 0)
-            WHEN uep.new_company IS NOT NULL AND uep.annual_old_with_vat <> 0 THEN (uep.annual_old_with_vat - uep.annual_new_with_vat) / uep.annual_old_with_vat
+            WHEN uep.tarifa_plana = TRUE AND uep.days > 0 THEN
+              (uep.current_monthly_annualized - uep.annual_new_with_vat) / NULLIF(uep.current_monthly_annualized, 0)
+            WHEN uep.new_company IS NOT NULL AND uep.annual_new_with_vat <> 0 THEN
+              -- Coste con la NUEVA tarifa SIN el +0.00234 (igual que el SELECT de la vista original)
+              (uep.annual_new_with_vat
+                - (
+                    COALESCE(uep.anual_consumption_p1,0::real) * COALESCE(uep.price_cp1,0::real)
+                    + COALESCE(NULLIF(uep.power_p1,0::double precision),1::real) * COALESCE(uep.price_pp1,0::real) * 365::double precision
+                  ) * (1::double precision + COALESCE(uep."VAT",0::real))
+              ) / uep.annual_new_with_vat
             ELSE 0.0::double precision
         END AS saving_percentage
     FROM unified_extended_prices uep
 ),
 
--- ====== FILTRO NP > Y ======
+-- ====== FILTROS NP > Y y RN > X (Gas — misma logica que luz) ======
+--   NP > 25 AND RN > 0
 filtered_np AS (
-    SELECT * FROM with_saving_pct
-    WHERE (
-        -- Gas B2C (Particular): NP > 20
-        (COALESCE(client_type::text, 'Particular') = 'Particular' AND total_crs > 20)
-        OR
-        -- Gas B2B (Empresa): NP > 100
-        (client_type::text = 'Empresa' AND total_crs > 100)
-    )
+  SELECT *
+  FROM with_saving_pct
+  WHERE np_value > 25
+    AND rn_value > 0
+),
+
+rank_prep AS (
+  SELECT
+    f.*,
+    -- Logica k con RAMPA LINEAL entre 5% y 15%
+    --   % ahorro <= 5     -> k = 0     (no se premia comision si ahorro es pobre)
+    --   5 < % ahorro < 15 -> k crece linealmente de 0 a 1000
+    --   % ahorro >= 15    -> k = 1000  (tope: prioriza NP/CRS)
+    CASE
+      WHEN f.saving_percentage <= 0.05 THEN 0
+      WHEN f.saving_percentage >= 0.15 THEN 1000
+      ELSE (f.saving_percentage - 0.05) / 0.10 * 1000
+    END AS k_factor
+  FROM filtered_np f
 ),
 
 -- ====================== RANKING ======================
 ranked_comparisons AS (
   SELECT
-    f.*,
-    CASE 
-        WHEN f.saving_percentage <= 0.10 THEN 0
-        WHEN f.rate_mode = 'Indexada' THEN 500
-        ELSE 1000
-    END AS k_factor,
+    rp.*,
+    -- Score del ranking: NP + RN (no total_crs)
+    rp.savings_yearly + (rp.k_factor * (rp.np_value + rp.rn_value)) AS ranked_crs,
     ROW_NUMBER() OVER (
-      PARTITION BY f.id
-      ORDER BY
-        f.savings_yearly + (CASE WHEN f.saving_percentage <= 0.10 THEN 0 WHEN f.rate_mode = 'Indexada' THEN 500 ELSE 1000 END * f.total_crs) DESC
-    ) AS rank,
-    f.savings_yearly + (CASE WHEN f.saving_percentage <= 0.10 THEN 0 WHEN f.rate_mode = 'Indexada' THEN 500 ELSE 1000 END * f.total_crs) AS ranked_crs
-  FROM filtered_np f
+      PARTITION BY rp.id
+      ORDER BY rp.savings_yearly + (rp.k_factor * (rp.np_value + rp.rn_value)) DESC
+    ) AS rank
+  FROM rank_prep rp
 )
 
 -- ====================== SELECT FINAL ======================
@@ -364,4 +421,4 @@ SELECT
 
 FROM ranked_comparisons rc
 LEFT JOIN _users_supervisors_all us ON rc.advisor_id = us.user_id
-WHERE rc.rank = 1 AND rc.type = 'gas';
+WHERE rc.rank = 1;
