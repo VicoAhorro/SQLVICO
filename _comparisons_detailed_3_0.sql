@@ -83,6 +83,7 @@ WITH calculated_prices_3_0 AS (
     cr.price_surpluses,
     cr.has_permanence,
     cr.has_gdo,
+    cr.paper_invoices_included,
     cr.rate_mode,
     0::real as total_excedentes_precio,
 
@@ -287,9 +288,12 @@ WITH calculated_prices_3_0 AS (
           )
           AND (
             c30.wants_permanence IS NOT TRUE
-            OR c30.term_month_i_want IS NULL 
+            OR c30.term_month_i_want IS NULL
             OR (cr.term_month <= c30.term_month_i_want AND cr.term_month > (c30.term_month_i_want - 12))
           )
+          -- ✅ Filtro factura en papel: si el cliente la quiere (TRUE), solo tarifas que la incluyen sin coste extra.
+          --    Si no la quiere o no lo especifica (FALSE/NULL), se aceptan todas.
+          AND (c30.paper_invoice_preference IS NOT TRUE OR COALESCE(cr.paper_invoices_included, TRUE) = TRUE)
         )
       )
   ) cr ON TRUE
@@ -753,7 +757,8 @@ SELECT DISTINCT
   rc.wants_permanence,
   rc.ssaa_preference,
   rc.new_ssaa,
-  rc.has_gdo
+  rc.has_gdo,
+  rc.paper_invoices_included
 
 FROM all_comparisons_ranked rc
 LEFT JOIN _users_supervisors_all us ON rc.advisor_id = us.user_id

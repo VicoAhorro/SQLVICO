@@ -88,6 +88,7 @@ base AS (
     cr.daily_maintenance_with_vat,
     cr.has_permanence,
     cr.has_gdo,
+    cr.paper_invoices_included,
     cr.rate_mode,
     cl.total_excedentes_precio
 
@@ -200,6 +201,10 @@ base AS (
   
   -- ✅ Filtro GDO (solo si el cliente lo solicita)
   AND (cl.wants_gdo = false OR cr.has_gdo = true)
+
+  -- ✅ Filtro factura en papel: si el cliente la quiere (TRUE), solo tarifas que la incluyen sin coste extra.
+  --    Si no la quiere o no lo especifica (FALSE/NULL), se aceptan todas.
+  AND (cl.paper_invoice_preference IS NOT TRUE OR COALESCE(cr.paper_invoices_included, TRUE) = TRUE)
   ),
 -- ====== Metrizaciones mensuales y totales base ======
 m_calc AS (
@@ -591,7 +596,8 @@ SELECT DISTINCT
   rc.wants_permanence,
   null::text AS ssaa_preference,
   null::text AS new_ssaa,
-  rc.has_gdo
+  rc.has_gdo,
+  rc.paper_invoices_included
 
 FROM with_advisor rc
 WHERE rc.rank = 1;
