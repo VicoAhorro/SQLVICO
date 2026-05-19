@@ -36,6 +36,7 @@ create table public.comparison_rates (
   term_month numeric null,
   has_gdo boolean not null default false,
   ssaa text null,
+  paper_invoices_included boolean not null default true,
   constraint comparison_rates_duplicate_pkey primary key (id)
 ) TABLESPACE pg_default;
 

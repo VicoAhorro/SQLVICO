@@ -43,6 +43,7 @@ create table public.comparison_gas (
   excluded_company_ids uuid[] not null default '{}'::uuid[],
   wants_gdo boolean not null default false,
   temp_client_phone text null,
+  paper_invoice_preference boolean null,
   constraint comparison_gas_pkey primary key (id),
   constraint comparison_gas_address_id_fkey foreign KEY (address_id) references clients_addresses (id),
   constraint comparison_gas_advisor_id_fkey foreign KEY (advisor_id) references users (user_id) on delete set null,

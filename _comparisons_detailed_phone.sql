@@ -153,7 +153,8 @@ select distinct
   rp.wants_permanence,
   null::text as ssaa_preference,
   null::text as new_ssaa,
-  false as has_gdo
+  false as has_gdo,
+  null::boolean as paper_invoices_included
 from
   (
     select

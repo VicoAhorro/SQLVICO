@@ -54,6 +54,7 @@ create table public.comparison_light (
   excluded_company_ids uuid[] not null default '{}'::uuid[],
   wants_gdo boolean not null default false,
   temp_client_phone text null,
+  paper_invoice_preference boolean null,
   constraint comparison_light_pkey primary key (id),
   constraint comparison_light_address_id_fkey foreign KEY (address_id) references clients_addresses (id),
   constraint comparison_light_advisor_id_fkey foreign KEY (advisor_id) references auth.users (id) on delete set null,

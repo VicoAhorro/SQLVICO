@@ -129,6 +129,7 @@ calculated_prices_gas AS (
     cg.region,
     cr.has_permanence,
     cr.has_gdo,
+    cr.paper_invoices_included,
     cr.rate_mode,
     0                                             AS total_excedentes_precio
 
@@ -208,15 +209,19 @@ calculated_prices_gas AS (
 
   -- ✅ Excluir companias seleccionadas (si hay ids)
   AND (
-    cg.excluded_company_ids IS NULL 
+    cg.excluded_company_ids IS NULL
     OR NOT (
       cr.company IN (
-        SELECT c_ex.name 
-        FROM companies c_ex 
+        SELECT c_ex.name
+        FROM companies c_ex
         WHERE c_ex.id = ANY (cg.excluded_company_ids)
       )
     )
   )
+
+  -- ✅ Filtro factura en papel: si el cliente la quiere (TRUE), solo tarifas que la incluyen sin coste extra.
+  --    Si no la quiere o no lo especifica (FALSE/NULL), se aceptan todas.
+  AND (cg.paper_invoice_preference IS NOT TRUE OR COALESCE(cr.paper_invoices_included, TRUE) = TRUE)
 
 ),
 unified_calculated_prices AS (
@@ -630,7 +635,8 @@ SELECT
   rc.wants_permanence,
   null::text AS ssaa_preference,
   null::text AS new_ssaa,
-  rc.has_gdo
+  rc.has_gdo,
+  rc.paper_invoices_included
 
 FROM all_comparisons_ranked rc
 LEFT JOIN _users_supervisors_all us ON rc.advisor_id = us.user_id
