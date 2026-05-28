@@ -105,7 +105,9 @@ CREATE TABLE IF NOT EXISTS public.comparison_3_0_results (
     type TEXT DEFAULT '3_0',
     has_permanence BOOLEAN,
     term_month INTEGER,
-    excluded_company_ids UUID[]
+    excluded_company_ids UUID[],
+    temp_dni TEXT,
+    temp_address TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_3_0_results_comparison_id ON public.comparison_3_0_results(comparison_id);

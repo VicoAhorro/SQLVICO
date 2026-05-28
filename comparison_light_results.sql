@@ -78,7 +78,9 @@ CREATE TABLE IF NOT EXISTS public.comparison_light_results (
     type TEXT DEFAULT 'light',
     has_permanence BOOLEAN,
     term_month INTEGER,
-    excluded_company_ids UUID[]
+    excluded_company_ids UUID[],
+    temp_dni TEXT,
+    temp_address TEXT
 );
 
 -- Índices para optimizar búsquedas
