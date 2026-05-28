@@ -65,7 +65,9 @@ CREATE TABLE IF NOT EXISTS public.comparison_gas_results (
     type TEXT DEFAULT 'gas',
     has_permanence BOOLEAN,
     term_month INTEGER,
-    excluded_company_ids UUID[]
+    excluded_company_ids UUID[],
+    temp_dni TEXT,
+    temp_address TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_gas_results_comparison_id ON public.comparison_gas_results(comparison_id);

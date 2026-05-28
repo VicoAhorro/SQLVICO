@@ -1,11 +1,11 @@
 -- Vista unificada de resultados de comparativas (Rank 1)
--- Replicando EXACTAMENTE el esquema de public._comparisons_detailed
--- Consultando desde las tablas de resultados (r) y tablas base (b) para evitar NULLs innecesarios
+-- Filtra: solo comparativas sin valuación creada (vía comparisons_valuations)
+-- Añade: temp_dni, temp_address en luz/gas/3.0 (NULL en phone)
 
 DROP VIEW IF EXISTS public.comparison_detailed_results;
 
 CREATE OR REPLACE VIEW public.comparison_detailed_results AS
--- Mapeo para LIGHT
+-- ─────────────────────────────── LIGHT ───────────────────────────────
 SELECT
   b.id,
   r.id as comparison_result_id,
@@ -48,7 +48,7 @@ SELECT
   NULL::real as power_p4,
   NULL::real as power_p5,
   NULL::real as power_p6,
-  b.current_total_invoice::real,
+  b.current_total_invoice,
   b.surpluses,
   NULL::real as total_surpluses_price,
   NULL::real as power_surpluses,
@@ -67,7 +67,7 @@ SELECT
   b.valuation_id,
   b.invoice_year,
   NULL::real as meter_rental,
-  b.preferred_subrate::text,
+  b.preferred_subrate,
   r.new_company,
   r.new_rate_name,
   r.new_subrate_name,
@@ -121,17 +121,17 @@ SELECT
   b.temp_client_name as client_name,
   b.temp_client_last_name as client_last_name,
   u.email as advisor_email,
-  TRIM(CONCAT_WS(' ', u.name, u.last_name)) as advisor_display_name,
-  TRIM(CONCAT_WS(' ', u.name, u.last_name)) as advisor_filter,
+  TRIM(BOTH FROM CONCAT_WS(' '::text, u.name, u.last_name)) as advisor_display_name,
+  TRIM(BOTH FROM CONCAT_WS(' '::text, u.name, u.last_name)) as advisor_filter,
   EXTRACT(MONTH FROM b.created_at) as created_month,
   EXTRACT(YEAR FROM b.created_at) as created_year,
-  TRIM(CONCAT_WS(' ', b.temp_client_name, b.temp_client_last_name, b."CUPS")) as search,
+  TRIM(BOTH FROM CONCAT_WS(' '::text, b.temp_client_name, b.temp_client_last_name, b."CUPS")) as search,
   r.new_company as company_filter,
   b.cif,
-  b.region::text,
+  b.region,
   NULL::double precision as daily_maintenance_with_vat,
   r.has_permanence,
-  r.rate_mode::text,
+  r.rate_mode,
   b.total_excedentes_precio,
   NULL::text as rate_i_have,
   b.term_month_i_want::integer as term_month,
@@ -140,15 +140,21 @@ SELECT
   b.wants_gdo,
   b.temp_client_phone,
   r.comparison_id,
-  b.wants_permanence
-FROM public.comparison_light_results r
-JOIN public.comparison_light b ON b.id = r.comparison_light_id
-LEFT JOIN public.users u ON u.user_id = b.advisor_id
-WHERE (b.deleted IS NULL OR b.deleted = false)
+  b.wants_permanence,
+  r.temp_dni,
+  r.temp_address
+FROM comparison_light_results r
+JOIN comparison_light b ON b.id = r.comparison_light_id
+LEFT JOIN users u ON u.user_id = b.advisor_id
+WHERE NOT EXISTS (
+  SELECT 1 FROM comparisons_valuations cv
+  WHERE cv.comparison_id = b.comparison_id
+     OR cv.comparison_id = r.comparison_id
+)
 
 UNION ALL
 
--- Mapeo para GAS
+-- ─────────────────────────────── GAS ───────────────────────────────
 SELECT
   b.id,
   r.id as comparison_result_id,
@@ -168,13 +174,13 @@ SELECT
   NULL::real as anual_consumption_p5,
   NULL::real as anual_consumption_p6,
   NULL::real as autoconsumo_precio,
-  b."precio actual kw"::real as "precio_kw_P1",
-  b."precio fijo actual dia"::real as "precio_kw_P2",
+  b."precio fijo actual dia" as "precio_kw_P1",
+  NULL::real as "precio_kw_P2",
   NULL::real as "precio_kw_P3",
   NULL::real as "precio_kw_P4",
   NULL::real as "precio_kw_P5",
   NULL::real as "precio_kw_P6",
-  NULL::real as "precio_kwh_P1",
+  b."precio actual kw" as "precio_kwh_P1",
   NULL::real as "precio_kwh_P2",
   NULL::real as "precio_kwh_P3",
   NULL::real as "precio_kwh_P4",
@@ -183,7 +189,7 @@ SELECT
   r.total_consumption,
   r.total_anual_consumption,
   b.totalconsumo,
-  b.totalfijo,
+  b.totalfijo as totalpotencia,
   b.current_total_invoice as totalfactura,
   NULL::real as power_p1,
   NULL::real as power_p2,
@@ -191,7 +197,7 @@ SELECT
   NULL::real as power_p4,
   NULL::real as power_p5,
   NULL::real as power_p6,
-  b.current_total_invoice::real,
+  b.current_total_invoice,
   NULL::real as surpluses,
   NULL::real as total_surpluses_price,
   NULL::real as power_surpluses,
@@ -204,13 +210,13 @@ SELECT
   b.rate_name,
   b.invoice_month,
   b.equipment_rental,
-  r.selfconsumption as selfconsumption,
+  r.selfconsumption,
   b.manual_data,
   NULL::real as reactive,
   b.valuation_id,
   b.invoice_year,
-  b.meter_rental as meter_rental,
-  b.preferred_subrate::text,
+  b.meter_rental,
+  b.preferred_subrate,
   r.new_company,
   r.new_rate_name,
   r.new_subrate_name,
@@ -264,17 +270,17 @@ SELECT
   b.temp_client_name as client_name,
   b.temp_client_last_name as client_last_name,
   u.email as advisor_email,
-  TRIM(CONCAT_WS(' ', u.name, u.last_name)) as advisor_display_name,
-  TRIM(CONCAT_WS(' ', u.name, u.last_name)) as advisor_filter,
+  TRIM(BOTH FROM CONCAT_WS(' '::text, u.name, u.last_name)) as advisor_display_name,
+  TRIM(BOTH FROM CONCAT_WS(' '::text, u.name, u.last_name)) as advisor_filter,
   EXTRACT(MONTH FROM b.created_at) as created_month,
   EXTRACT(YEAR FROM b.created_at) as created_year,
-  TRIM(CONCAT_WS(' ', b.temp_client_name, b.temp_client_last_name, b."CUPS")) as search,
+  TRIM(BOTH FROM CONCAT_WS(' '::text, b.temp_client_name, b.temp_client_last_name, b."CUPS")) as search,
   r.new_company as company_filter,
   b.cif,
-  b.region::text,
+  b.region,
   NULL::double precision as daily_maintenance_with_vat,
   r.has_permanence,
-  r.rate_mode::text,
+  r.rate_mode,
   NULL::double precision as total_excedentes_precio,
   NULL::text as rate_i_have,
   b.term_month_i_want::integer as term_month,
@@ -283,15 +289,21 @@ SELECT
   b.wants_gdo,
   b.temp_client_phone,
   r.comparison_id,
-  NULL::boolean as wants_permanence
-FROM public.comparison_gas_results r
-JOIN public.comparison_gas b ON b.id = r.comparison_gas_id
-LEFT JOIN public.users u ON u.user_id = b.advisor_id
-WHERE (b.deleted IS NULL OR b.deleted = false)
+  NULL::boolean as wants_permanence,
+  r.temp_dni,
+  r.temp_address
+FROM comparison_gas_results r
+JOIN comparison_gas b ON b.id = r.comparison_gas_id
+LEFT JOIN users u ON u.user_id = b.advisor_id
+WHERE NOT EXISTS (
+  SELECT 1 FROM comparisons_valuations cv
+  WHERE cv.comparison_id = b.comparison_id
+     OR cv.comparison_id = r.comparison_id
+)
 
 UNION ALL
 
--- Mapeo para 3.0
+-- ─────────────────────────────── 3.0 ───────────────────────────────
 SELECT
   b.id,
   r.id as comparison_result_id,
@@ -334,9 +346,9 @@ SELECT
   b.power_p4,
   b.power_p5,
   b.power_p6,
-  b.current_total_invoice::real,
+  b.current_total_invoice,
   b.surpluses,
-  r.total_surpluses_price::real,
+  r.total_surpluses_price::real as total_surpluses_price,
   b.power_surpluses,
   b."VAT",
   b.power_days as days,
@@ -353,7 +365,7 @@ SELECT
   b.valuation_id,
   b.invoice_year,
   NULL::real as meter_rental,
-  b.preferred_subrate::text,
+  b.preferred_subrate,
   r.new_company,
   r.new_rate_name,
   r.new_subrate_name,
@@ -407,34 +419,40 @@ SELECT
   b.temp_client_name as client_name,
   b.temp_client_last_name as client_last_name,
   u.email as advisor_email,
-  TRIM(CONCAT_WS(' ', u.name, u.last_name)) as advisor_display_name,
-  TRIM(CONCAT_WS(' ', u.name, u.last_name)) as advisor_filter,
+  TRIM(BOTH FROM CONCAT_WS(' '::text, u.name, u.last_name)) as advisor_display_name,
+  TRIM(BOTH FROM CONCAT_WS(' '::text, u.name, u.last_name)) as advisor_filter,
   EXTRACT(MONTH FROM b.created_at) as created_month,
   EXTRACT(YEAR FROM b.created_at) as created_year,
-  TRIM(CONCAT_WS(' ', b.temp_client_name, b.temp_client_last_name, b."CUPS")) as search,
+  TRIM(BOTH FROM CONCAT_WS(' '::text, b.temp_client_name, b.temp_client_last_name, b."CUPS")) as search,
   r.new_company as company_filter,
   b.cif,
-  b.region::text,
+  b.region,
   NULL::double precision as daily_maintenance_with_vat,
   r.has_permanence,
-  r.rate_mode::text,
+  r.rate_mode,
   NULL::double precision as total_excedentes_precio,
-  b.rate_i_have::text,
+  b.rate_i_have::text as rate_i_have,
   b.term_month_i_want::integer as term_month,
   b.term_month_i_want,
   b.excluded_company_ids,
   b.wants_gdo,
   b.temp_client_phone,
   r.comparison_id,
-  NULL::boolean as wants_permanence
-FROM public.comparison_3_0_results r
-JOIN public.comparison_3_0 b ON b.id = r.comparison_3_0_id
-LEFT JOIN public.users u ON u.user_id = b.advisor_id
-WHERE (b.deleted IS NULL OR b.deleted = false)
+  NULL::boolean as wants_permanence,
+  r.temp_dni,
+  r.temp_address
+FROM comparison_3_0_results r
+JOIN comparison_3_0 b ON b.id = r.comparison_3_0_id
+LEFT JOIN users u ON u.user_id = b.advisor_id
+WHERE NOT EXISTS (
+  SELECT 1 FROM comparisons_valuations cv
+  WHERE cv.comparison_id = b.comparison_id
+     OR cv.comparison_id = r.comparison_id
+)
 
 UNION ALL
 
--- Mapeo para PHONE
+-- ─────────────────────────────── PHONE ───────────────────────────────
 SELECT
   b.id,
   r.id as comparison_result_id,
@@ -468,13 +486,16 @@ SELECT
   NULL::real as "precio_kwh_P6",
   NULL::real as total_consumption,
   NULL::real as total_anual_consumption,
+  NULL::real as totalconsumo,
+  NULL::real as totalpotencia,
+  b.current_total_invoice as totalfactura,
   NULL::real as power_p1,
   NULL::real as power_p2,
   NULL::real as power_p3,
   NULL::real as power_p4,
   NULL::real as power_p5,
   NULL::real as power_p6,
-  b.current_total_invoice::real,
+  b.current_total_invoice::real as current_total_invoice,
   NULL::real as surpluses,
   NULL::real as total_surpluses_price,
   NULL::real as power_surpluses,
@@ -547,16 +568,16 @@ SELECT
   b.temp_client_name as client_name,
   b.temp_client_last_name as client_last_name,
   u.email as advisor_email,
-  TRIM(CONCAT_WS(' ', u.name, u.last_name)) as advisor_display_name,
-  TRIM(CONCAT_WS(' ', u.name, u.last_name)) as advisor_filter,
+  TRIM(BOTH FROM CONCAT_WS(' '::text, u.name, u.last_name)) as advisor_display_name,
+  TRIM(BOTH FROM CONCAT_WS(' '::text, u.name, u.last_name)) as advisor_filter,
   EXTRACT(MONTH FROM b.created_at) as created_month,
   EXTRACT(YEAR FROM b.created_at) as created_year,
-  TRIM(CONCAT_WS(' ', b.temp_client_name, b.temp_client_last_name)) as search,
+  TRIM(BOTH FROM CONCAT_WS(' '::text, b.temp_client_name, b.temp_client_last_name)) as search,
   r.new_company as company_filter,
   NULL::boolean as cif,
-  b.region::text,
+  b.region,
   NULL::double precision as daily_maintenance_with_vat,
-  FALSE as has_permanence, -- Hardcoded false for phone as in original view
+  FALSE as has_permanence,
   NULL::text as rate_mode,
   NULL::double precision as total_excedentes_precio,
   NULL::text as rate_i_have,
@@ -566,10 +587,15 @@ SELECT
   NULL::boolean as wants_gdo,
   NULL::text as temp_client_phone,
   r.comparison_id,
-  b.wants_permanence
-FROM public.comparison_phone_results r
-JOIN public.comparison_phone b ON b.id = r.comparison_phone_id
-LEFT JOIN public.users u ON u.user_id = b.advisor_id
-WHERE (b.deleted IS NULL OR b.deleted = false);
+  b.wants_permanence,
+  NULL::text as temp_dni,
+  NULL::text as temp_address
+FROM comparison_phone_results r
+JOIN comparison_phone b ON b.id = r.comparison_phone_id
+LEFT JOIN users u ON u.user_id = b.advisor_id
+WHERE NOT EXISTS (
+  SELECT 1 FROM comparisons_valuations cv
+  WHERE cv.comparison_id = r.comparison_id
+);
 
-COMMENT ON VIEW public.comparison_detailed_results IS 'Vista consolidada Rank 1 con id de base table y corrección de has_permanence para PHONE.';
+COMMENT ON VIEW public.comparison_detailed_results IS 'Vista consolidada Rank 1, filtra comparativas sin valoración. Incluye temp_dni y temp_address (OCR del titular y dirección de suministro).';
