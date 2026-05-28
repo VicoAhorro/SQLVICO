@@ -353,6 +353,7 @@ unified_extended_prices AS (
                   COALESCE(ucp.power_p4,0::real)*COALESCE(ucp.price_pp4,0::real)*365.0 +
                   COALESCE(ucp.power_p5,0::real)*COALESCE(ucp.price_pp5,0::real)*365.0 +
                   COALESCE(ucp.power_p6,0::real)*COALESCE(ucp.price_pp6,0::real)*365.0
+                  - COALESCE(ucp.surpluses,0) * (182.5::double precision / NULLIF(ucp.days::numeric,0)) * COALESCE(ucp.price_surpluses,0)
                 ) * (1 + COALESCE(ucp.iee, 0.05113)) * (1 + COALESCE(ucp."VAT",0))
             )
           -- Fija vs Fija
@@ -389,6 +390,7 @@ unified_extended_prices AS (
                   COALESCE(ucp.power_p4,0::real)*COALESCE(ucp.price_pp4,0::real)*365.0 +
                   COALESCE(ucp.power_p5,0::real)*COALESCE(ucp.price_pp5,0::real)*365.0 +
                   COALESCE(ucp.power_p6,0::real)*COALESCE(ucp.price_pp6,0::real)*365.0
+                  - COALESCE(ucp.surpluses,0) * (182.5::double precision / NULLIF(ucp.days::numeric,0)) * COALESCE(ucp.price_surpluses,0)
                 ) * (1 + COALESCE(ucp.iee, 0.05113)) * (1 + COALESCE(ucp."VAT",0))
             )
           -- Indexada vs Fija
@@ -425,6 +427,7 @@ unified_extended_prices AS (
                   COALESCE(ucp.power_p4,0::real)*COALESCE(ucp.price_pp4,0::real)*365.0 +
                   COALESCE(ucp.power_p5,0::real)*COALESCE(ucp.price_pp5,0::real)*365.0 +
                   COALESCE(ucp.power_p6,0::real)*COALESCE(ucp.price_pp6,0::real)*365.0
+                  - COALESCE(ucp.surpluses,0) * (182.5::double precision / NULLIF(ucp.days::numeric,0)) * COALESCE(ucp.price_surpluses,0)
                 ) * (1 + COALESCE(ucp.iee, 0.05113)) * (1 + COALESCE(ucp."VAT",0))
             )
           -- Fija vs Indexada
@@ -461,6 +464,7 @@ unified_extended_prices AS (
                   COALESCE(ucp.power_p4,0::real)*COALESCE(ucp.price_pp4,0::real)*365.0 +
                   COALESCE(ucp.power_p5,0::real)*COALESCE(ucp.price_pp5,0::real)*365.0 +
                   COALESCE(ucp.power_p6,0::real)*COALESCE(ucp.price_pp6,0::real)*365.0
+                  - COALESCE(ucp.surpluses,0) * (182.5::double precision / NULLIF(ucp.days::numeric,0)) * COALESCE(ucp.price_surpluses,0)
                 ) * (1 + COALESCE(ucp.iee, 0.05113)) * (1 + COALESCE(ucp."VAT",0))
             )
           ELSE 0.0
@@ -690,6 +694,7 @@ SELECT DISTINCT
       COALESCE(rc.power_p4,0::real) * COALESCE(rc.price_pp4,0::real) * 365::double precision +
       COALESCE(rc.power_p5,0::real) * COALESCE(rc.price_pp5,0::real) * 365::double precision +
       COALESCE(rc.power_p6,0::real) * COALESCE(rc.price_pp6,0::real) * 365::double precision
+      - COALESCE(rc.surpluses,0) * (182.5::double precision / NULLIF(rc.days::numeric,0)) * COALESCE(rc.price_surpluses,0)
     ) * (1::double precision + COALESCE(rc.iee, 0.05113)::double precision)
   ) * (1::double precision + COALESCE(rc."VAT",0::real)) AS new_total_yearly_price_with_vat,
 
