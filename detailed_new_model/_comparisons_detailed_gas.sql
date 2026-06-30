@@ -288,7 +288,10 @@ unified_extended_prices AS (
 
   CROSS JOIN LATERAL (
     SELECT
-      COALESCE(ucp.anual_consumption_p1,0::real) * COALESCE(ucp."precio_kwh_P1",0::real) AS annual_new_energy_pre_vat
+      -- IH (+0.00234) también en el lado ACTUAL del cliente: es un impuesto que
+      -- paga igual con cualquier comercializadora, así que va en AMBOS lados y
+      -- se cancela en la resta (antes solo iba en el candidato → penalizaba el cambio).
+      COALESCE(ucp.anual_consumption_p1,0::real) * (COALESCE(ucp."precio_kwh_P1",0::real) + 0.00234) AS annual_new_energy_pre_vat
   ) a1
 
   CROSS JOIN LATERAL (
@@ -335,7 +338,7 @@ unified_extended_prices AS (
   ) sly
 ),
 
--- ====== AHORRO % PARA LOGICA K (formula identica a la original — sin +0.00234) ======
+-- ====== AHORRO % PARA LOGICA K (coherente con savings_yearly — IH +0.00234 en AMBOS lados) ======
 with_saving_pct AS (
     SELECT
         uep.*,
@@ -343,10 +346,12 @@ with_saving_pct AS (
             WHEN uep.tarifa_plana = TRUE AND uep.days > 0 THEN
               (uep.current_monthly_annualized - uep.annual_new_with_vat) / NULLIF(uep.current_monthly_annualized, 0)
             WHEN uep.new_company IS NOT NULL AND uep.annual_new_with_vat <> 0 THEN
-              -- Coste con la NUEVA tarifa SIN el +0.00234 (igual que el SELECT de la vista original)
+              -- Coste con la NUEVA tarifa CON el +0.00234 (IH), igual que en
+              -- savings_yearly. Como annual_new_with_vat (actual) también lleva
+              -- ya el IH, el % y los € coinciden SIEMPRE en signo.
               (uep.annual_new_with_vat
                 - (
-                    COALESCE(uep.anual_consumption_p1,0::real) * COALESCE(uep.price_cp1,0::real)
+                    COALESCE(uep.anual_consumption_p1,0::real) * (COALESCE(uep.price_cp1,0::real) + 0.00234)
                     + COALESCE(NULLIF(uep.power_p1,0::double precision),1::real) * COALESCE(uep.price_pp1,0::real) * 365::double precision
                   ) * (1::double precision + COALESCE(uep."VAT",0::real))
               ) / uep.annual_new_with_vat
